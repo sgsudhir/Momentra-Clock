@@ -13,7 +13,6 @@
 #include "driver/spi_master.h"
 #include "esp_check.h"
 #include "esp_log.h"
-#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -35,6 +34,9 @@ static const char *TAG = "clock_display";
 static spi_device_handle_t spi;
 static EventGroupHandle_t display_events;
 static portMUX_TYPE pause_lock = portMUX_INITIALIZER_UNLOCKED;
+static portMUX_TYPE frame_lock = portMUX_INITIALIZER_UNLOCKED;
+static clock_frame_t rendered_frame;
+static unsigned rendered_brightness;
 static bool paused;
 static bool ready;
 #define DISPLAY_PAUSED BIT0
@@ -110,13 +112,46 @@ static esp_err_t refresh_row(const clock_frame_t *frame, unsigned row, unsigned 
     return ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
 
+static void render_task(void *arg)
+{
+    (void)arg;
+    while (clock_display_is_ready()) {
+        clock_frame_t frame;
+        clock_config_t config;
+        clock_store_get(&config);
+        clock_timers_snapshot_t timers = clock_timers_snapshot();
+        bool stopwatch = timers.stopwatch_state == TIMER_RUNNING;
+        bool reminder = timers.reminder_state == TIMER_RUNNING || timers.reminder_state == TIMER_RINGING;
+        if (stopwatch) {
+            uint64_t centis = timers.stopwatch_us / 10000;
+            clock_render_timer(&frame, false, centis / 6000, centis / 100 % 60,
+                               centis % 100, config.font);
+        } else if (reminder) {
+            uint64_t seconds = (timers.reminder_us + 999999) / 1000000;
+            clock_render_timer(&frame, true, seconds / 3600, seconds / 60 % 60,
+                               seconds % 60, config.font);
+        } else {
+            clock_time_snapshot_t time_state = clock_time_snapshot();
+            struct tm local = {0};
+            if (time_state.valid) localtime_r(&time_state.unix_time, &local);
+            clock_render(&frame, time_state.valid, local.tm_hour, local.tm_min,
+                         config.format_12h, config.font);
+        }
+        portENTER_CRITICAL(&frame_lock);
+        rendered_frame = frame;
+        rendered_brightness = config.brightness;
+        portEXIT_CRITICAL(&frame_lock);
+        vTaskDelay(pdMS_TO_TICKS(stopwatch ? 10 : 100));
+    }
+    vTaskDelete(NULL);
+}
+
 static void display_task(void *arg)
 {
     (void)arg;
     clock_frame_t frame = {0};
     unsigned row = 0;
     unsigned brightness = 0;
-    int64_t next_render = 0;
     for (;;) {
         if (is_paused()) {
             esp_err_t err = ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
@@ -133,30 +168,11 @@ static void display_task(void *arg)
         }
         xEventGroupClearBits(display_events, DISPLAY_PAUSED);
         xEventGroupSetBits(display_events, DISPLAY_RUNNING);
-        int64_t now = esp_timer_get_time();
-        if (now >= next_render && row == 0) {
-            clock_config_t config;
-            clock_store_get(&config);
-            clock_timers_snapshot_t timers = clock_timers_snapshot();
-            bool stopwatch = timers.stopwatch_state == TIMER_RUNNING;
-            bool reminder = timers.reminder_state == TIMER_RUNNING || timers.reminder_state == TIMER_RINGING;
-            if (stopwatch) {
-                uint64_t centis = timers.stopwatch_us / 10000;
-                clock_render_timer(&frame, false, centis / 6000, centis / 100 % 60,
-                                   centis % 100, config.font);
-            } else if (reminder) {
-                uint64_t seconds = (timers.reminder_us + 999999) / 1000000;
-                clock_render_timer(&frame, true, seconds / 3600, seconds / 60 % 60,
-                                   seconds % 60, config.font);
-            } else {
-                clock_time_snapshot_t time_state = clock_time_snapshot();
-                struct tm local = {0};
-                if (time_state.valid) localtime_r(&time_state.unix_time, &local);
-                clock_render(&frame, time_state.valid, local.tm_hour, local.tm_min,
-                             config.format_12h, config.font);
-            }
-            brightness = config.brightness;
-            next_render = now + (stopwatch ? 10000 : 100000);
+        if (row == 0) {
+            portENTER_CRITICAL(&frame_lock);
+            frame = rendered_frame;
+            brightness = rendered_brightness;
+            portEXIT_CRITICAL(&frame_lock);
         }
         esp_err_t err = refresh_row(&frame, row, brightness);
         if (err != ESP_OK) {
@@ -215,6 +231,10 @@ esp_err_t clock_display_start(void)
                                             .spics_io_num = -1, .queue_size = 1};
     ESP_RETURN_ON_ERROR(spi_bus_add_device(SPI3_HOST, &device, &spi), TAG, "panel SPI device failed");
     set_ready(true);
+    if (xTaskCreatePinnedToCore(render_task, "clock_render", 4096, NULL, 5, NULL, 0) != pdPASS) {
+        set_ready(false);
+        return ESP_ERR_NO_MEM;
+    }
     if (xTaskCreatePinnedToCore(display_task, "clock_display", 4096, NULL, 8, NULL, 1) != pdPASS) {
         set_ready(false);
         return ESP_ERR_NO_MEM;

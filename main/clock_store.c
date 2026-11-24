@@ -1,5 +1,6 @@
 #include "clock_store.h"
 
+#include <stddef.h>
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -9,6 +10,18 @@
 static SemaphoreHandle_t state_lock;
 static SemaphoreHandle_t write_lock;
 static clock_config_t current;
+
+typedef struct {
+    uint8_t brightness;
+    uint8_t font;
+    uint8_t format_12h;
+    uint8_t hourly_enabled;
+    uint8_t hourly_pattern;
+    clock_alarm_t alarms[CLOCK_ALARM_COUNT];
+} clock_config_v1_t;
+
+_Static_assert(offsetof(clock_config_t, feedback_enabled) == sizeof(clock_config_v1_t),
+               "legacy config layout changed");
 
 esp_err_t clock_store_init(void)
 {
@@ -35,17 +48,23 @@ esp_err_t clock_store_init(void)
     if (err != ESP_OK) {
         return err;
     }
-    size_t size = sizeof(current);
+    clock_config_defaults(&current);
+    size_t size = sizeof(clock_config_v1_t);
     err = nvs_get_blob(handle, "config_v1", &current, &size);
-    nvs_close(handle);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
-        clock_config_defaults(&current);
-        return ESP_OK;
+        err = ESP_OK;
+    } else if (err == ESP_OK && size != sizeof(clock_config_v1_t)) {
+        err = ESP_ERR_INVALID_STATE;
     }
+    if (err == ESP_OK) {
+        err = nvs_get_u8(handle, "feedback", &current.feedback_enabled);
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+    }
+    nvs_close(handle);
     if (err != ESP_OK) {
         return err;
     }
-    return size == sizeof(current) && clock_config_valid(&current) ? ESP_OK : ESP_ERR_INVALID_STATE;
+    return clock_config_valid(&current) ? ESP_OK : ESP_ERR_INVALID_STATE;
 }
 
 void clock_store_get(clock_config_t *config)
@@ -64,7 +83,10 @@ static esp_err_t commit_update(const clock_config_t *old, const clock_config_t *
     nvs_handle_t handle;
     esp_err_t err = nvs_open("clock", NVS_READWRITE, &handle);
     if (err == ESP_OK) {
-        err = nvs_set_blob(handle, "config_v1", config, sizeof(*config));
+        err = nvs_set_blob(handle, "config_v1", config, sizeof(clock_config_v1_t));
+        if (err == ESP_OK) {
+            err = nvs_set_u8(handle, "feedback", config->feedback_enabled);
+        }
         if (err == ESP_OK) {
             err = nvs_commit(handle);
         }

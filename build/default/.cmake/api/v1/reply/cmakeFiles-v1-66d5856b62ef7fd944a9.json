@@ -330,6 +330,20 @@
 			"path" : "/usr/share/cmake-3.28/Modules/Compiler/GNU.cmake"
 		},
 		{
+			"path" : ".git/HEAD"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/sudhir/.espressif/v6.1/esp-idf/tools/cmake/third_party/GetGitRevisionDescription.cmake.in"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/default/CMakeFiles/git-data/grabRef.cmake"
+		},
+		{
+			"path" : ".git/refs/heads/main"
+		},
+		{
 			"isExternal" : true,
 			"path" : "/home/sudhir/.espressif/v6.1/esp-idf/tools/kconfig_new/config.env.in"
 		},

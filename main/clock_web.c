@@ -124,13 +124,14 @@ static esp_err_t status_handler(httpd_req_t *req)
 static esp_err_t settings_handler(httpd_req_t *req)
 {
     clock_form_t form;
-    int brightness, font, format, hourly, pattern;
-    if (!read_form(req, &form) || form.count != 5 ||
+    int brightness, font, format, hourly, pattern, feedback = 0;
+    if (!read_form(req, &form) || (form.count != 5 && form.count != 6) ||
         !clock_form_int(&form, "brightness", 0, 100, &brightness) ||
         !clock_form_int(&form, "font", 0, CLOCK_FONT_COUNT - 1, &font) ||
         !clock_form_int(&form, "format_12h", 0, 1, &format) ||
         !clock_form_int(&form, "hourly_enabled", 0, 1, &hourly) ||
-        !clock_form_int(&form, "hourly_pattern", 0, CLOCK_SOUND_COUNT - 1, &pattern)) {
+        !clock_form_int(&form, "hourly_pattern", 0, CLOCK_SOUND_COUNT - 1, &pattern) ||
+        (form.count == 6 && !clock_form_int(&form, "feedback_enabled", 0, 1, &feedback))) {
         return json_error(req, "400 Bad Request", "invalid settings");
     }
     clock_config_t old;
@@ -141,6 +142,7 @@ static esp_err_t settings_handler(httpd_req_t *req)
     updated.format_12h = format;
     updated.hourly_enabled = hourly;
     updated.hourly_pattern = pattern;
+    if (form.count == 6) updated.feedback_enabled = feedback;
     esp_err_t err = clock_store_set_if_unchanged(&old, &updated);
     if (err == ESP_ERR_INVALID_STATE) return json_error(req, "409 Conflict", "settings changed; retry");
     if (err != ESP_OK) {

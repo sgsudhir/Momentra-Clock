@@ -50,6 +50,9 @@ void clock_alarm_stop(void)
 void clock_alarm_beep(void)
 {
     if (!clock_alarm_is_configured()) return;
+    clock_config_t config;
+    clock_store_get(&config);
+    if (!config.feedback_enabled) return;
     portENTER_CRITICAL(&status_lock);
     beep_requested = true;
     portEXIT_CRITICAL(&status_lock);
@@ -158,8 +161,13 @@ static void alarm_task(void *arg)
         } else if (timers.reminder_state == TIMER_RINGING) {
             output = clock_sound_reminder((now - reminder_start) / 1000);
         } else {
-            if (now >= feedback_end && take_beep_request()) feedback_end = now + 100000;
-            output = now < feedback_end;
+            if (!config.feedback_enabled) {
+                take_beep_request();
+                feedback_end = 0;
+            } else if (now >= feedback_end && take_beep_request()) {
+                feedback_end = now + 100000;
+            }
+            output = config.feedback_enabled && now < feedback_end;
         }
         if (output != previous_output) {
             buzzer_write(output);

@@ -65,17 +65,18 @@ manufacturer before connecting it. DMD2 itself is
 not included; this is an ESP-IDF implementation. GPIO selection is based on the
 [ESP32-WROOM-32 datasheet](https://documentation.espressif.com/esp32-wroom-32_datasheet_en.pdf).
 
-The display application task is pinned to core 1; alarm, HTTP and network
-application tasks are pinned to core 0. ESP-IDF system tasks and interrupts
-retain their normal affinity, so core 1 is not absolutely exclusive. Flash
-operations may still affect refresh. OTA explicitly blanks the display while
-writing.
+The panel scan task is pinned to core 1. A separate core 0 task renders frames,
+which the scan task snapshots at a row-group boundary. Alarm, HTTP and network
+application tasks and the TCP/IP task are pinned to core 0. Other ESP-IDF
+system tasks and interrupts can still affect core 1; scan timing remains
+scheduler-dependent, and flash operations may affect refresh. OTA explicitly
+blanks the display while writing.
 
 ## Build and flash
 
 Use the ESP-IDF VS Code extension to configure and build for ESP32. The
 `sdkconfig.defaults` file sets 4 MB flash, an OTA partition table, rollback,
-and a 1 kHz FreeRTOS tick. Existing SDK configurations may need these options
+a 1 kHz FreeRTOS tick and core 0 TCP/IP affinity. Existing SDK configurations may need these options
 set in menuconfig. The partition table has two 1.875 MiB OTA application slots.
 
 Changing the partition layout can make existing flash contents inaccessible or
@@ -140,8 +141,11 @@ Forest and Midnight; the choice is stored in the browser, not on the clock.
 Subtle visual animation runs in the browser and respects reduced-motion settings.
 Simultaneous alarms sound together for the longest requested duration; an
 alarm takes priority over an hourly chime. Reboot stops any ongoing sound.
-Successful settings and alarm saves request a 100 ms buzzer confirmation;
-feedback waits for existing alarm, chime or reminder sounds.
+Successful settings, alarm and Wi-Fi saves and stopwatch actions request a
+100 ms buzzer confirmation; feedback waits for existing alarm, chime or reminder
+sounds. The Button sound feedback control is saved with the display settings
+and persists across restarts. Turning it off also silences the stopwatch limit
+confirmation, but does not mute alarms, reminders or hourly chimes.
 The hourly patterns are one long beep, two medium beeps, three short beeps,
 and two short beeps followed by a long beep. Alarms repeat four rapid beeps
 followed by a pause; reminders repeat the previous slower
@@ -180,10 +184,12 @@ return 500 with an `error` field. Successful writes return `{"ok":true}`.
   unsynchronized), `sync_age_seconds` (null if never synchronized),
   `display_ready`, `buzzer_configured`, `ringing`, `ringing_mask`,
   `stopwatch_state`, `stopwatch_ms`, `reminder_state`, `reminder_ms`,
-  `brightness`, `font`, `format_12h`, `hourly_enabled`, `hourly_pattern`, and
+  `brightness`, `font`, `format_12h`, `hourly_enabled`, `hourly_pattern`,
+  `feedback_enabled`, and
   an `alarms` array. Wi-Fi credentials are never returned.
 - `POST /api/settings`: `brightness` 0-100, `font` 0-4, `format_12h` 0/1,
-  `hourly_enabled` 0/1, and `hourly_pattern` 0-3.
+  `hourly_enabled` 0/1, `hourly_pattern` 0-3, and optional `feedback_enabled`
+  0/1. Omitting `feedback_enabled` preserves its current value for older clients.
 - `POST /api/alarm`: `index` 0-4, `enabled` 0/1, `hour` 0-23, `minute` 0-59,
   `repeat` 0 (once) or 1 (daily), and `duration_seconds`.
 - `POST /api/alarm/stop`: stop the current alarm sound.
@@ -207,7 +213,7 @@ Examples (replace the address):
 
 ```sh
 curl http://192.168.1.50/api/status
-curl -X POST -d 'brightness=50&font=0&format_12h=0&hourly_enabled=1&hourly_pattern=0' http://192.168.1.50/api/settings
+curl -X POST -d 'brightness=50&font=0&format_12h=0&hourly_enabled=1&hourly_pattern=0&feedback_enabled=1' http://192.168.1.50/api/settings
 curl -X POST -d 'index=0&enabled=1&hour=7&minute=30&repeat=1&duration_seconds=30' http://192.168.1.50/api/alarm
 curl -X POST http://192.168.1.50/api/alarm/stop
 curl -X POST --data-binary @firmware.bin http://192.168.1.50/api/ota

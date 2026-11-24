@@ -27,6 +27,7 @@ typedef struct {
     uint8_t hourly_enabled;
     uint8_t hourly_pattern;
     clock_alarm_t alarms[CLOCK_ALARM_COUNT];
+    uint8_t feedback_enabled;
 } clock_config_t;
 
 void clock_config_defaults(clock_config_t *config);

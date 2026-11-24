@@ -34,6 +34,7 @@ int main(void)
     status.stopwatch_ms = 1234;
     status.reminder_state = TIMER_PAUSED;
     status.reminder_ms = 5000;
+    status.config.feedback_enabled = 0;
     status.config.alarms[2] = (clock_alarm_t){1, 7, 30, ALARM_DAILY, 180};
     assert(clock_status_json(&status, output, sizeof(output)));
     puts(output);

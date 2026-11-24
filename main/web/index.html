@@ -218,7 +218,12 @@ html[data-theme=sand] .timer-value{color:#8b5a24}
         <label class="field">Chime pattern
           <select name="hourly_pattern"><option value="0">Pattern 1</option><option value="1">Pattern 2</option><option value="2">Pattern 3</option><option value="3">Pattern 4</option></select>
         </label>
+        <div class="field">Button sound feedback
+          <input type="hidden" name="feedback_enabled">
+          <button id="feedback-toggle" type="button" class="secondary" aria-pressed="false">Feedback: Off</button>
+        </div>
       </div>
+      <p class="hint">Save settings to apply. Alarms, reminders and hourly chimes are unaffected.</p>
       <button class="primary action">Save settings</button>
       </fieldset>
     </form>
@@ -358,6 +363,11 @@ function fill(form, values) {
   for (const [key, value] of Object.entries(values)) if (form.elements[key]) form.elements[key].value = value;
 }
 function brightnessLabel() { $('brightness-value').textContent = $('settings').elements.brightness.value + '%'; }
+function renderFeedback() {
+  const enabled = $('settings').elements.feedback_enabled.value === '1';
+  $('feedback-toggle').textContent = 'Feedback: ' + (enabled ? 'On' : 'Off');
+  $('feedback-toggle').setAttribute('aria-pressed', String(enabled));
+}
 function fillAlarm() {
   if (data) {
     const alarm = data.alarms[Number($('alarm-index').value)];
@@ -507,6 +517,7 @@ async function refresh() {
     if (!populated) {
       fill($('settings'), data);
       brightnessLabel();
+      renderFeedback();
       fillAlarm();
       $('settings').querySelector('fieldset').disabled = false;
       $('alarm').querySelector('fieldset').disabled = false;
@@ -557,6 +568,11 @@ for (const id of ['settings', 'alarm', 'wifi']) {
   };
 }
 $('settings').elements.brightness.oninput = brightnessLabel;
+$('feedback-toggle').onclick = () => {
+  const field = $('settings').elements.feedback_enabled;
+  field.value = field.value === '1' ? '0' : '1';
+  renderFeedback();
+};
 $('alarm-index').onchange = fillAlarm;
 async function timerAction(name, action) {
   if (!data || timerBusy) return;

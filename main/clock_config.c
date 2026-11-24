@@ -6,6 +6,7 @@ void clock_config_defaults(clock_config_t *config)
 {
     memset(config, 0, sizeof(*config));
     config->brightness = 50;
+    config->feedback_enabled = 1;
     for (unsigned i = 0; i < CLOCK_ALARM_COUNT; ++i) {
         config->alarms[i].duration_seconds = 10;
     }
@@ -21,7 +22,7 @@ bool clock_config_valid(const clock_config_t *config)
 {
     if (!config || config->brightness > 100 || config->font >= CLOCK_FONT_COUNT ||
         config->format_12h > 1 || config->hourly_enabled > 1 ||
-        config->hourly_pattern >= CLOCK_SOUND_COUNT) {
+        config->hourly_pattern >= CLOCK_SOUND_COUNT || config->feedback_enabled > 1) {
         return false;
     }
     for (unsigned i = 0; i < CLOCK_ALARM_COUNT; ++i) {

@@ -40,7 +40,8 @@ bool clock_status_json(const clock_status_t *status, char *buffer, size_t capaci
         "\"ringing\":%s,\"ringing_mask\":%u,"
         "\"stopwatch_state\":%u,\"stopwatch_ms\":%lld,"
         "\"reminder_state\":%u,\"reminder_ms\":%lld,\"brightness\":%u,\"font\":%u,"
-        "\"format_12h\":%u,\"hourly_enabled\":%u,\"hourly_pattern\":%u,\"alarms\":[",
+        "\"format_12h\":%u,\"hourly_enabled\":%u,\"hourly_pattern\":%u,"
+        "\"feedback_enabled\":%u,\"alarms\":[",
         (long long)status->uptime_seconds, (unsigned)status->free_heap_bytes,
         (unsigned)status->min_free_heap_bytes, status->wifi_connected ? "true" : "false",
         status->setup_ap ? "true" : "false", rssi, ip,
@@ -54,7 +55,7 @@ bool clock_status_json(const clock_status_t *status, char *buffer, size_t capaci
         status->ringing_mask, (unsigned)status->stopwatch_state, (long long)status->stopwatch_ms,
         (unsigned)status->reminder_state, (long long)status->reminder_ms,
         config->brightness, config->font, config->format_12h,
-        config->hourly_enabled, config->hourly_pattern);
+        config->hourly_enabled, config->hourly_pattern, config->feedback_enabled);
     if (length < 0 || (size_t)length >= capacity) return false;
     size_t used = length;
     for (unsigned i = 0; i < CLOCK_ALARM_COUNT; ++i) {
