@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/CMakeFiles/bootloader
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/CMakeFiles/bootloader.rule
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/CMakeFiles/bootloader-complete.rule
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule

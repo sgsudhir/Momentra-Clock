@@ -1,0 +1,6 @@
+-Wno-frame-address
+-mlongcalls
+-fno-builtin-memcpy
+-fno-builtin-memset
+-fno-builtin-bzero
+"-specs=/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/specs/picolibc.specs"

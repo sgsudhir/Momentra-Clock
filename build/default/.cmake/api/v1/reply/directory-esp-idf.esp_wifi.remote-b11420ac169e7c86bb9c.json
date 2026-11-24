@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "esp-idf/esp_wifi/remote",
+		"source" : "/home/sudhir/.espressif/v6.1/esp-idf/components/esp_wifi/remote"
+	}
+}

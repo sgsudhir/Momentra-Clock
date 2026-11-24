@@ -1,0 +1,2 @@
+source /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader/gdbinit/symbols
+source /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader/gdbinit/connect

@@ -1,0 +1,76 @@
+Command: ninja all
+[1/14] Generating ../../ota_data_initial.bin
+[2/14] Generating ../../partition_table/partition-table.bin
+Partition table binary generated. Contents:
+*******************************************************************************
+# ESP-IDF Partition Table
+# Name, Type, SubType, Offset, Size, Flags
+nvs,data,nvs,0x9000,24K,
+otadata,data,ota,0xf000,8K,
+phy_init,data,phy,0x11000,4K,
+ota_0,app,ota_0,0x20000,1920K,
+ota_1,app,ota_1,0x200000,1920K,
+*******************************************************************************
+[3/14] Generating x509_crt_bundle
+[4/14] Generating ../../x509_crt_bundle.S
+[5/14] Building ASM object esp-idf/mbedtls/CMakeFiles/__idf_mbedtls.dir/__/__/x509_crt_bundle.S.obj
+[6/14] Linking C static library esp-idf/mbedtls/libmbedtls.a
+[7/14] Generating esp-idf/esp_system/ld/sections.ld
+Skipping linker script generation, section names unchanged
+[8/14] Performing configure step for 'bootloader'
+-- Minimal build - OFF
+-- Building ESP-IDF components for target esp32
+-- KCONFIG_REPORT_VERBOSITY not set, using default
+-- Project sdkconfig file /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/sdkconfig
+NOTE: /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader/Kconfig.projbuild:383: Deprecation notice: hex literal '0' without '0x' prefix detected. In the next major version, hex literals will be required to have a '0x' prefix.
+NOTE: /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader/Kconfig.projbuild:423: Deprecation notice: hex literal '0' without '0x' prefix detected. In the next major version, hex literals will be required to have a '0x' prefix.
+NOTE: /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hw_support/./lowpower/port/esp32p4/Kconfig.p4_rev3_mspi_workaround:6: Deprecation notice: hex literal '0' without '0x' prefix detected. In the next major version, hex literals will be required to have a '0x' prefix.
+NOTE: /home/sudhir/.espressif/v6.1/esp-idf/components/esp_system/./port/soc/esp32/Kconfig.memory:24: Deprecation notice: hex literal '0' without '0x' prefix detected. In the next major version, hex literals will be required to have a '0x' prefix.
+NOTE: Kconfig parser version: 1
+NOTE: Kconfig defaults policy: use sdkconfig
+NOTE: Status: Finished successfully
+-- Compiler supported targets: xtensa-esp-elf
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Adding linker script /home/sudhir/.espressif/v6.1/esp-idf/components/soc/esp32/ld/esp32.peripherals.ld
+-- Adding linker script /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_regi2c/esp32/rom.regi2c.ld
+-- Bootloader project name: "bootloader" version: 1
+-- Adding linker script /home/sudhir/.espressif/v6.1/esp-idf/components/esp_rom/esp32/ld/esp32.rom.ld
+-- Adding linker script /home/sudhir/.espressif/v6.1/esp-idf/components/esp_rom/esp32/ld/esp32.rom.api.ld
+-- Adding linker script /home/sudhir/.espressif/v6.1/esp-idf/components/esp_rom/esp32/ld/esp32.rom.libgcc.ld
+-- Adding linker script /home/sudhir/.espressif/v6.1/esp-idf/components/esp_rom/esp32/ld/esp32.rom.libc-funcs.ld
+-- Components: bootloader bootloader_support efuse esp_app_format esp_blockdev esp_bootloader_format esp_common esp_hal_ana_conv esp_hal_clock esp_hal_dma esp_hal_gpio esp_hal_gpspi esp_hal_i2s esp_hal_mspi esp_hal_pmu esp_hal_regi2c esp_hal_rtc_timer esp_hal_security esp_hal_systimer esp_hal_timg esp_hal_uart esp_hal_usb esp_hal_wdt esp_hw_support esp_libc esp_rom esp_security esp_stdio esp_system esptool_py freertos hal log main micro-ecc partition_table soc spi_flash xtensa
+-- Component paths: /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader_support /home/sudhir/.espressif/v6.1/esp-idf/components/efuse /home/sudhir/.espressif/v6.1/esp-idf/components/esp_app_format /home/sudhir/.espressif/v6.1/esp-idf/components/esp_blockdev /home/sudhir/.espressif/v6.1/esp-idf/components/esp_bootloader_format /home/sudhir/.espressif/v6.1/esp-idf/components/esp_common /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_ana_conv /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_clock /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_dma /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_gpio /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_gpspi /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_i2s /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_mspi /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_pmu /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_regi2c /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_rtc_timer /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_security /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_systimer /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_timg /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_uart /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_usb /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hal_wdt /home/sudhir/.espressif/v6.1/esp-idf/components/esp_hw_support /home/sudhir/.espressif/v6.1/esp-idf/components/esp_libc /home/sudhir/.espressif/v6.1/esp-idf/components/esp_rom /home/sudhir/.espressif/v6.1/esp-idf/components/esp_security /home/sudhir/.espressif/v6.1/esp-idf/components/esp_stdio /home/sudhir/.espressif/v6.1/esp-idf/components/esp_system /home/sudhir/.espressif/v6.1/esp-idf/components/esptool_py /home/sudhir/.espressif/v6.1/esp-idf/components/freertos /home/sudhir/.espressif/v6.1/esp-idf/components/hal /home/sudhir/.espressif/v6.1/esp-idf/components/log /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader/subproject/main /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader/subproject/components/micro-ecc /home/sudhir/.espressif/v6.1/esp-idf/components/partition_table /home/sudhir/.espressif/v6.1/esp-idf/components/soc /home/sudhir/.espressif/v6.1/esp-idf/components/spi_flash /home/sudhir/.espressif/v6.1/esp-idf/components/xtensa
+-- Adding linker script /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader/subproject/main/ld/esp32/bootloader.memory.ld.in
+--   -> Preprocessing .in script: /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader/subproject/main/ld/esp32/bootloader.memory.ld.in
+-- Adding linker script /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader/subproject/main/ld/esp32/bootloader.sections.ld.in
+--   -> Preprocessing .in script: /home/sudhir/.espressif/v6.1/esp-idf/components/bootloader/subproject/main/ld/esp32/bootloader.sections.ld.in
+-- Configuring done (4.7s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader
+[9/14] Performing build step for 'bootloader'
+[1/2] Generating binary image from built executable
+esptool v5.6.0
+Creating ESP32 image...
+Merged 2 ELF sections.
+Successfully created ESP32 image.
+Generated /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader/bootloader.bin
+[2/2] cd /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader && /home/sudhir/.espressif/python_env/idf6.1_py3.12_env/bin/python /home/sudhir/.espressif/v6.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x1000 /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/bootloader/bootloader.bin
+Bootloader binary size 0x6680 bytes. 0x980 bytes (8%) free.
+[10/14] No install step for 'bootloader'
+[11/14] Completed 'bootloader'
+[12/14] Linking CXX executable ESP_P10_Clock_BLR.elf
+[13/14] Generating binary image from built executable
+esptool v5.6.0
+Creating ESP32 image...
+Merged 3 ELF sections.
+Successfully created ESP32 image.
+Generated /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/ESP_P10_Clock_BLR.bin
+[14/14] cd /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default && /home/sudhir/.espressif/python_env/idf6.1_py3.12_env/bin/python /home/sudhir/.espressif/v6.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/partition_table/partition-table.bin /home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/ESP_P10_Clock_BLR.bin
+ESP_P10_Clock_BLR.bin binary size 0xf1ec0 bytes. Smallest app partition is 0x1e0000 bytes. 0xee140 bytes (50%) free.

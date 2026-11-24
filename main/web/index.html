@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111b39">
+<title>Momentra Clock</title>
+<style>
+:root{color-scheme:light;--ink:#172343;--muted:#60708f;--border:#e1e8f4;--blue:#405cec;--bg:#f4f7fc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select{font:inherit}
+button,input,select{min-height:42px}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #90abff;outline-offset:2px}
+button:disabled{opacity:.6;cursor:wait}
+fieldset{margin:0;padding:0;border:0;min-width:0}
+[hidden]{display:none!important}
+main{position:relative;z-index:1;max-width:980px;margin:auto;padding:24px 20px 48px}
+.snow{position:fixed;inset:0;overflow:hidden;pointer-events:none}
+.snow span{position:absolute;top:-12px;width:7px;height:7px;border-radius:50%;background:#a2b9e8;opacity:.5;animation:snowfall linear infinite}
+.snow span:nth-child(1){left:10%;animation-duration:19s;animation-delay:-8s}
+.snow span:nth-child(2){left:32%;animation-duration:24s;animation-delay:-17s}
+.snow span:nth-child(3){left:53%;animation-duration:21s;animation-delay:-4s}
+.snow span:nth-child(4){left:74%;animation-duration:26s;animation-delay:-20s}
+.snow span:nth-child(5){left:91%;animation-duration:18s;animation-delay:-12s}
+@keyframes snowfall{to{transform:translateY(calc(100vh + 24px)) translateX(18px)}}
+@media(prefers-reduced-motion:reduce){.snow{display:none}}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.03em;font-size:19px}
+.brand-icon{display:grid;place-items:center;width:37px;height:37px;color:white;background:linear-gradient(135deg,#4c69f2,#9b56e6);border-radius:12px;font-size:18px}
+.brand-icon svg{width:26px;height:26px}
+.live{font-size:12px;font-weight:700;color:#496080;display:flex;align-items:center;gap:7px}
+.header-actions{display:flex;align-items:center;gap:14px}
+.refresh{width:42px;padding:0;background:#e8edff;color:#344cc5;font-size:22px}
+.dot{width:8px;height:8px;border-radius:50%;background:#21bd8c;box-shadow:0 0 0 4px #d8f6ea}
+.live.offline .dot{background:#e8a43c;box-shadow:0 0 0 4px #fff0d9}
+.notice{margin:0 0 16px;padding:12px 15px;border-radius:12px;background:#fff2df;color:#824d13}
+.message{margin:0 0 16px;padding:12px 15px;border-radius:12px;background:#e8f8f2;color:#17674e}
+.message.error{background:#fff0ee;color:#a23a35}
+.alarm-banner{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px;padding:16px 18px;border:1px solid #ffb9ab;border-radius:16px;background:#fff0ed;color:#8f2f28}
+.alarm-banner strong,.alarm-banner span{display:block}
+.alarm-banner span{font-size:13px;margin-top:2px}
+.alarm-banner button{background:#cf463b;color:#fff;white-space:nowrap}
+.hero{position:relative;overflow:hidden;padding:28px;border-radius:22px;background:linear-gradient(120deg,#17234c,#354bb3 70%,#7458bd);color:white;box-shadow:0 12px 30px #233c8e20}
+.hero:after{content:"";position:absolute;width:220px;height:220px;right:-60px;top:-100px;border:35px solid #ffffff0d;border-radius:50%;pointer-events:none;animation:hero-drift 12s ease-in-out infinite alternate}
+@keyframes hero-drift{to{transform:translate(-18px,18px) scale(1.08)}}
+@media(prefers-reduced-motion:reduce){.hero:after{animation:none}}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;opacity:.76}
+.clock{margin:6px 0 0;font-size:clamp(38px,8vw,64px);line-height:1.15;font-weight:750;letter-spacing:-.055em;font-variant-numeric:tabular-nums}
+.hero-sub{margin:8px 0 20px;color:#dce5ff}
+.hero-pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{padding:5px 10px;border-radius:999px;background:#ffffff1a;color:#fff;font-size:12px;font-weight:650}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px;align-items:start}
+.card{background:white;border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:0 6px 18px #283b6810}
+.card h2{margin:0;font-size:17px;letter-spacing:-.02em}
+.subtitle{margin:4px 0 18px;color:var(--muted);font-size:13px}
+.timer-value{font-size:32px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:#344cc5}
+.timer-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.duration-picker{margin-top:12px}
+.duration-picker summary{cursor:pointer;color:var(--blue);font-weight:700}
+.duration-picker .fields{margin-top:10px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.field{display:block;min-width:0;color:#465675;font-size:13px;font-weight:650}
+.field.full{grid-column:1/-1}
+input:not([type=range]),select{display:block;width:100%;margin-top:5px;padding:9px 10px;color:var(--ink);border:1px solid #d5deed;background:#fbfcff;border-radius:9px}
+select.theme-select{width:auto;margin:0;padding:8px 10px}
+input[type=range]{width:100%;accent-color:var(--blue);margin:7px 0 0}
+.range-heading{display:flex;justify-content:space-between}
+output{color:var(--blue);font-weight:800}
+button{border:0;border-radius:10px;padding:10px 15px;font-weight:700}
+.primary{background:var(--blue);color:white}
+.primary:hover{background:#3049d1}
+.secondary{background:#edf1ff;color:#344cc5}
+.secondary:hover{background:#dfe6ff}
+.action{margin-top:17px}
+details.card{padding:0}
+details.card>summary{padding:18px 20px;cursor:pointer;list-style:none;font-weight:750}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary:after{content:"+";float:right;color:var(--blue);font-size:21px;line-height:1}
+details.card[open]>summary:after{content:"−"}
+.details-body{padding:0 20px 20px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px;margin:0}
+.stats div{padding:10px 0;border-top:1px solid #edf1f7}
+dt{color:var(--muted);font-size:12px}
+dd{margin:2px 0 0;font-weight:700;overflow-wrap:anywhere}
+.alarm-list{margin:0;padding:0;list-style:none}
+.alarm-list li{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid #edf1f7}
+.alarm-list span{color:var(--muted);font-size:13px;text-align:right}
+.hint{font-size:12px;color:var(--muted);margin:10px 0}
+.danger-note{font-size:12px;color:#996228}
+.stack{display:grid;gap:16px}
+.file{font-size:13px}
+footer{text-align:center;color:#71809c;font-size:12px;margin-top:22px}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]){color-scheme:dark;--ink:#edf2ff;--muted:#a9b8d5;--border:#33415f;--blue:#aab8ff;--bg:#101726}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .card{background:#1b263b;box-shadow:0 6px 18px #0003}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .field{color:#c3d0e7}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) input:not([type=range]),html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) select{background:#111b2d;border-color:#485979;color:var(--ink)}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .primary{background:#5369d7;color:#fff}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .primary:hover{background:#657bea}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .secondary,html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .refresh{background:#303f64;color:#e1e8ff}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .secondary:hover,html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .refresh:hover{background:#40527b}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .timer-value{color:#b4c1ff}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .live{color:#c3d0e7}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .dot{box-shadow:0 0 0 4px #205647}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .live.offline .dot{box-shadow:0 0 0 4px #594528}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .notice{background:#503b24;color:#ffdda5}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .message{background:#1f493c;color:#b1f1d8}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .message.error{background:#542d32;color:#ffc6be}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .alarm-banner{background:#502b32;border-color:#91535a;color:#ffd2c9}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .danger-note{color:#eec58e}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .stats div,html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) .alarm-list li{border-color:var(--border)}
+html:is([data-theme=dark],[data-theme=forest],[data-theme=midnight]) footer{color:var(--muted)}
+html[data-theme=forest]{--ink:#e7f5eb;--muted:#afcbbb;--border:#35584a;--blue:#95dbb0;--bg:#101e19}
+html[data-theme=forest] .card{background:#1a3027}
+html[data-theme=forest] input:not([type=range]),html[data-theme=forest] select{background:#11241b;border-color:#496b58}
+html[data-theme=forest] .hero{background:linear-gradient(120deg,#173e30,#21644c 70%,#286c50)}
+html[data-theme=forest] .primary{background:#28734e}
+html[data-theme=forest] .primary:hover{background:#34895e}
+html[data-theme=forest] .secondary,html[data-theme=forest] .refresh{background:#305443;color:#def5e6}
+html[data-theme=forest] .secondary:hover,html[data-theme=forest] .refresh:hover{background:#416c55}
+html[data-theme=forest] .timer-value{color:#a5e1b9}
+html[data-theme=midnight]{--ink:#f4edff;--muted:#c8b7dc;--border:#52415f;--blue:#d4b8ff;--bg:#1a1424}
+html[data-theme=midnight] .card{background:#2c2138}
+html[data-theme=midnight] input:not([type=range]),html[data-theme=midnight] select{background:#201729;border-color:#695476}
+html[data-theme=midnight] .hero{background:linear-gradient(120deg,#352044,#68417d 70%,#804477)}
+html[data-theme=midnight] .primary{background:#8053a0}
+html[data-theme=midnight] .primary:hover{background:#9468b2}
+html[data-theme=midnight] .secondary,html[data-theme=midnight] .refresh{background:#51405f;color:#f1e4ff}
+html[data-theme=midnight] .secondary:hover,html[data-theme=midnight] .refresh:hover{background:#665171}
+html[data-theme=midnight] .timer-value{color:#d9c0ff}
+html[data-theme=ocean]{--ink:#123b40;--muted:#4e7477;--border:#cfe8e5;--blue:#087b78;--bg:#edf8f7}
+html[data-theme=ocean] .hero{background:linear-gradient(120deg,#103c50,#087b78 70%,#28a59b)}
+html[data-theme=ocean] .primary:hover{background:#076865}
+html[data-theme=ocean] .secondary,html[data-theme=ocean] .refresh{background:#d9f1ed;color:#075e5b}
+html[data-theme=ocean] .secondary:hover,html[data-theme=ocean] .refresh:hover{background:#c3e8e1}
+html[data-theme=ocean] .timer-value{color:#087b78}
+html[data-theme=sunset]{--ink:#492a34;--muted:#86636d;--border:#f1dbdf;--blue:#b13f69;--bg:#fff5f1}
+html[data-theme=sunset] .hero{background:linear-gradient(120deg,#66344b,#b13f69 70%,#e89064)}
+html[data-theme=sunset] .primary:hover{background:#963354}
+html[data-theme=sunset] .secondary,html[data-theme=sunset] .refresh{background:#fbe5e8;color:#963354}
+html[data-theme=sunset] .secondary:hover,html[data-theme=sunset] .refresh:hover{background:#f6d2d9}
+html[data-theme=sunset] .timer-value{color:#b13f69}
+html[data-theme=lavender]{--ink:#392d50;--muted:#70647f;--border:#e6dcef;--blue:#704aa3;--bg:#f8f3fc}
+html[data-theme=lavender] .hero{background:linear-gradient(120deg,#40305f,#704aa3 70%,#865395)}
+html[data-theme=lavender] .primary:hover{background:#5b3b87}
+html[data-theme=lavender] .secondary,html[data-theme=lavender] .refresh{background:#eee3f8;color:#5b3b87}
+html[data-theme=lavender] .secondary:hover,html[data-theme=lavender] .refresh:hover{background:#e2d2f0}
+html[data-theme=lavender] .timer-value{color:#704aa3}
+html[data-theme=sand]{--ink:#45392a;--muted:#7a6b55;--border:#ebdfc9;--blue:#8b5a24;--bg:#fbf6eb}
+html[data-theme=sand] .hero{background:linear-gradient(120deg,#57412b,#8b5a24 70%,#91612f)}
+html[data-theme=sand] .primary:hover{background:#70471c}
+html[data-theme=sand] .secondary,html[data-theme=sand] .refresh{background:#f4e8d1;color:#70471c}
+html[data-theme=sand] .secondary:hover,html[data-theme=sand] .refresh:hover{background:#ebd9b8}
+html[data-theme=sand] .timer-value{color:#8b5a24}
+@media(max-width:680px){main{padding:18px 14px 36px}.grid{grid-template-columns:1fr}.hero{padding:23px}.alarm-banner{align-items:flex-start;flex-direction:column}.alarm-banner button{width:100%}}
+@media(max-width:520px){header{flex-wrap:wrap}.header-actions{margin-left:auto;gap:8px}}
+</style>
+</head>
+<body>
+<div class="snow" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+<main>
+<header>
+  <div class="brand"><span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="12" stroke="currentColor" stroke-width="1.5"/><path d="M16 7v1.5M25 16h-1.5M16 25v-1.5M7 16h1.5M16 10.5V16l4 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="16" r="1" fill="currentColor"/></svg></span> Momentra Clock</div>
+  <div class="header-actions">
+    <div id="connection" class="live offline"><span class="dot"></span><span id="connection-text">Connecting</span></div>
+    <select id="theme" class="theme-select" aria-label="Theme">
+      <option value="light">Light</option><option value="dark">Dark</option>
+      <option value="ocean">Ocean</option><option value="sunset">Sunset</option>
+      <option value="lavender">Lavender</option><option value="sand">Sand</option>
+      <option value="forest">Forest</option><option value="midnight">Midnight</option>
+    </select>
+    <button class="refresh" type="button" aria-label="Refresh page" title="Refresh page" onclick="location.reload()">&#x21bb;</button>
+  </div>
+</header>
+
+<section id="ringing" class="alarm-banner" role="alert" hidden>
+  <div><strong>Alarm is ringing</strong><span id="ringing-detail">Your alarm needs attention.</span></div>
+  <button id="stop" type="button">Stop alarm</button>
+</section>
+<section id="reminder-ringing" class="alarm-banner" role="alert" hidden>
+  <div><strong>Reminder is ringing</strong><span>Stops automatically after 15 seconds.</span></div>
+  <button id="reminder-dismiss" type="button">Stop reminder</button>
+</section>
+<p id="message" class="message" role="status" hidden></p>
+<p id="connection-warning" class="notice" role="status" hidden>Can't reach the clock. Displayed information may be out of date; reconnect to refresh it.</p>
+
+<section class="hero" aria-label="Clock overview">
+  <div class="eyebrow">Your clock · Asia/Kolkata</div>
+  <div id="clock" class="clock">--:--</div>
+  <p id="clock-date" class="hero-sub">Waiting for clock status</p>
+  <div class="hero-pills">
+    <span id="network-summary" class="pill">Wi-Fi: checking</span>
+    <span id="alarm-summary" class="pill">Alarms: checking</span>
+    <span id="chime-summary" class="pill">Chime: checking</span>
+  </div>
+</section>
+
+<div class="grid">
+  <section class="card">
+    <h2>Display &amp; sound</h2>
+    <p class="subtitle">Make the clock feel like yours.</p>
+    <form id="settings">
+      <fieldset disabled>
+      <div class="fields">
+        <label class="field full"><span class="range-heading"><span>Brightness</span><output id="brightness-value">--</output></span>
+          <input name="brightness" type="range" min="0" max="100" required>
+        </label>
+        <label class="field">Font style
+          <select name="font"><option value="0">Style 1</option><option value="1">Style 2</option><option value="2">Style 3</option><option value="3">Style 4</option><option value="4">Style 5</option></select>
+        </label>
+        <label class="field">Time format
+          <select name="format_12h"><option value="0">24 hour</option><option value="1">12 hour</option></select>
+        </label>
+        <label class="field">Hourly chime
+          <select name="hourly_enabled"><option value="0">Off</option><option value="1">On</option></select>
+        </label>
+        <label class="field">Chime pattern
+          <select name="hourly_pattern"><option value="0">Pattern 1</option><option value="1">Pattern 2</option><option value="2">Pattern 3</option><option value="3">Pattern 4</option></select>
+        </label>
+      </div>
+      <button class="primary action">Save settings</button>
+      </fieldset>
+    </form>
+  </section>
+
+  <details class="card">
+    <summary>Alarms</summary>
+    <div class="details-body">
+    <p class="subtitle">Five slots, Survives power loss.</p>
+    <h3>Active alarms</h3>
+    <ul id="alarm-list" class="alarm-list"></ul>
+     <form id="alarm">
+      <fieldset disabled>
+      <br></br>
+      <div class="fields">
+        <label class="field">Alarm slot
+          <select name="index" id="alarm-index"><option value="0">Alarm 1</option><option value="1">Alarm 2</option><option value="2">Alarm 3</option><option value="3">Alarm 4</option><option value="4">Alarm 5</option></select>
+        </label>
+        <label class="field">Status
+          <select name="enabled"><option value="0">Off</option><option value="1">On</option></select>
+        </label>
+        <label class="field">Hour (0–23)<input name="hour" type="number" min="0" max="23" required></label>
+        <label class="field">Minute<input name="minute" type="number" min="0" max="59" required></label>
+        <label class="field">Repeat<select name="repeat"><option value="0">Once</option><option value="1">Daily</option></select></label>
+        <label class="field">Duration<select name="duration_seconds" id="duration"></select></label>
+      </div>
+      <button class="primary action">Save alarm</button>
+      </fieldset>
+    </form>
+    </div>
+  </details>
+
+  <details class="card">
+    <summary>Stopwatch</summary>
+    <div class="details-body">
+    <p class="subtitle">Shown on the panel while running.</p>
+    <div id="stopwatch-value" class="timer-value">00:00:0</div>
+    <p id="stopwatch-state" class="hint">Stopped</p>
+    <div class="timer-actions">
+      <button id="stopwatch-start" type="button" class="primary" disabled>Start</button>
+      <button id="stopwatch-pause" type="button" class="secondary" disabled>Pause</button>
+      <button id="stopwatch-stop" type="button" class="secondary" disabled>Stop &amp; reset</button>
+    </div>
+    </div>
+  </details>
+
+  <details class="card">
+    <summary>Reminder</summary>
+    <div class="details-body">
+    <p class="subtitle">One countdown up to 24 hours; cleared on reboot.</p>
+    <div id="reminder-value" class="timer-value">00:00:00</div>
+    <p id="reminder-state" class="hint">Stopped</p>
+    <details class="duration-picker" id="duration-picker">
+      <summary>Set duration · <span id="reminder-duration-label">00:01:00</span></summary>
+      <div class="fields">
+        <label class="field">Hours<select id="reminder-hours"></select></label>
+        <label class="field">Minutes<select id="reminder-minutes"></select></label>
+        <label class="field">Seconds<select id="reminder-secs"></select></label>
+      </div>
+    </details>
+    <div class="timer-actions">
+      <button id="reminder-start" type="button" class="primary" disabled>Start</button>
+      <button id="reminder-pause" type="button" class="secondary" disabled>Pause</button>
+      <button id="reminder-stop" type="button" class="secondary" disabled>Stop &amp; reset</button>
+    </div>
+    </div>
+  </details>
+
+  <details class="card">
+    <summary>System details</summary>
+    <div class="details-body">
+      <p class="subtitle">Live device health.</p>
+      <dl class="stats">
+        <div><dt>Uptime</dt><dd id="stat-uptime">—</dd></div>
+        <div><dt>Wi-Fi signal</dt><dd id="stat-rssi">—</dd></div>
+        <div><dt>Local IP</dt><dd id="stat-ip">—</dd></div>
+        <div><dt>Wi-Fi MAC</dt><dd id="stat-mac">—</dd></div>
+        <div><dt>Time sync</dt><dd id="stat-sync">—</dd></div>
+        <div><dt>Panel driver</dt><dd id="stat-display">—</dd></div>
+        <div><dt>Buzzer</dt><dd id="stat-buzzer">—</dd></div>
+        <div><dt>Brightness</dt><dd id="stat-brightness">—</dd></div>
+        <div><dt>Free memory</dt><dd id="stat-heap">—</dd></div>
+        <div><dt>Minimum free memory</dt><dd id="stat-min-heap">—</dd></div>
+      </dl>
+    </div>
+  </details>
+
+  <div class="stack">
+    <details class="card" id="wifi-details">
+      <summary>Wi-Fi setup</summary>
+      <div class="details-body">
+        <p class="danger-note">The setup AP is open: nearby devices can observe credentials sent over it.</p>
+        <form id="wifi">
+          <div class="fields">
+            <label class="field full">Available networks
+              <select id="wifi-networks" required><option value="">Scan for networks</option><option value="hidden">Other / hidden network</option></select>
+            </label>
+            <label class="field full" id="hidden-network" hidden>Hidden network name<input id="wifi-hidden" maxlength="32" autocomplete="off"></label>
+            <label class="field full">Password<input name="password" type="password" maxlength="63" autocomplete="new-password"></label>
+          </div>
+          <p id="scan-message" class="hint">Open Wi-Fi setup to scan nearby networks.</p>
+          <button id="scan" class="secondary" type="button">Scan again</button>
+          <p class="hint">Leave the password empty for an open network, or use 8–63 bytes.</p>
+          <button id="wifi-save" class="secondary">Save &amp; reboot</button>
+        </form>
+      </div>
+    </details>
+    <details class="card">
+      <summary>Device maintenance</summary>
+      <div class="details-body">
+        <p class="hint">Firmware upload requires station-only mode. Upload only trusted firmware.</p>
+        <label class="field">Firmware (.bin)<input class="file" id="firmware" type="file" accept=".bin"></label>
+        <button class="secondary action" id="upload" type="button">Upload &amp; reboot</button>
+        <button class="secondary action" id="reboot" type="button">Reboot device</button>
+      </div>
+    </details>
+  </div>
+</div>
+<footer>Local controls are unauthenticated. Use only on a trusted network.
+  </br>Build: 24th Nov 2026.
+  </br>Nandi Park, Gotigere, Bangalore, India. 
+</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let data, receivedAt, populated = false, refreshing = false, timerBusy = false, scanBusy = false;
+let clockAnchorMs = null, clockAnchorAt = 0, lastClockSync = 0;
+const duration = $('duration');
+for (const n of [5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 240, 300]) duration.add(new Option(n + ' seconds', n));
+const reminderParts = ['reminder-hours', 'reminder-minutes', 'reminder-secs'];
+for (const [index, id] of reminderParts.entries()) {
+  for (let n = 0; n <= (index === 0 ? 24 : 59); n++) $(id).add(new Option(String(n).padStart(2, '0'), n));
+  $(id).onchange = () => { $('reminder-duration-label').textContent = reminderParts.map(part => pad($(part).value)).join(':'); };
+}
+$('reminder-minutes').value = '1';
+function fill(form, values) {
+  for (const [key, value] of Object.entries(values)) if (form.elements[key]) form.elements[key].value = value;
+}
+function brightnessLabel() { $('brightness-value').textContent = $('settings').elements.brightness.value + '%'; }
+function fillAlarm() {
+  if (data) {
+    const alarm = data.alarms[Number($('alarm-index').value)];
+    const legacy = duration.querySelector('[data-legacy]');
+    if (legacy) legacy.remove();
+    if (![...duration.options].some(option => Number(option.value) === alarm.duration_seconds)) {
+      const option = new Option(alarm.duration_seconds + ' seconds (saved)', alarm.duration_seconds);
+      option.dataset.legacy = 'true';
+      duration.add(option);
+    }
+    fill($('alarm'), alarm);
+  }
+}
+function elapsed(seconds) {
+  seconds = Math.max(0, Math.floor(seconds));
+  const days = Math.floor(seconds / 86400), hours = Math.floor(seconds % 86400 / 3600);
+  const minutes = Math.floor(seconds % 3600 / 60);
+  if (days) return days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds % 60 + 's';
+  if (hours) return hours + 'h ' + minutes + 'm ' + seconds % 60 + 's';
+  if (minutes) return minutes + 'm ' + seconds % 60 + 's';
+  return seconds + 's';
+}
+function renderClock() {
+  if (!data || clockAnchorMs === null) {
+    $('clock').textContent = '--:--';
+    $('clock-date').textContent = data ? 'Waiting for NTP time sync' : 'Waiting for clock status';
+    return;
+  }
+  const now = new Date(clockAnchorMs + 19800000 + (performance.now() - clockAnchorAt));
+  const hour = now.getUTCHours(), minute = String(now.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(now.getUTCSeconds()).padStart(2, '0');
+  $('clock').textContent = data.format_12h ? (hour % 12 || 12) + ':' + minute + ':' + seconds + (hour < 12 ? ' AM' : ' PM') : String(hour).padStart(2, '0') + ':' + minute + ':' + seconds;
+  $('clock-date').textContent = now.toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
+}
+function renderStatus() {
+  $('ringing').hidden = !data.ringing;
+  const active = data.alarms.map((_, i) => i + 1).filter(i => data.ringing_mask & (1 << (i - 1)));
+  $('ringing-detail').textContent = active.length ? 'Ringing: ' + active.map(i => 'Alarm ' + i).join(', ') : 'Your alarm needs attention.';
+  $('network-summary').textContent = data.setup_ap ? 'Wi-Fi: setup AP' : data.wifi_connected ? 'Wi-Fi: connected' : 'Wi-Fi: offline';
+  const enabled = data.alarms.filter(a => a.enabled).length;
+  $('alarm-summary').textContent = enabled + (enabled === 1 ? ' alarm on' : ' alarms on');
+  $('chime-summary').textContent = 'Chime: ' + (data.hourly_enabled ? 'on' : 'off');
+  $('stat-uptime').textContent = elapsed(data.uptime_seconds);
+  $('stat-rssi').textContent = data.wifi_rssi === null ? 'Unavailable' : data.wifi_rssi + ' dBm';
+  $('stat-ip').textContent = data.local_ip || 'Unavailable';
+  $('stat-mac').textContent = data.wifi_mac;
+  $('stat-sync').textContent = data.time_valid ? 'Synced' + (data.sync_age_seconds === null ? '' : ' · ' + elapsed(data.sync_age_seconds) + ' ago') : 'Not synchronized';
+  $('stat-display').textContent = data.display_ready ? 'Ready' : 'Not ready';
+  $('stat-buzzer').textContent = data.buzzer_configured ? 'Configured' : 'Not configured';
+  $('stat-brightness').textContent = data.brightness + '%';
+  $('stat-heap').textContent = (data.free_heap_bytes / 1024).toFixed(1) + ' KiB';
+  $('stat-min-heap').textContent = (data.min_free_heap_bytes / 1024).toFixed(1) + ' KiB';
+  renderAlarms();
+  renderClock();
+  renderTimers();
+}
+function renderAlarms() {
+  if (!data) return;
+  const list = $('alarm-list');
+  const enabledAlarms = data.alarms.map((alarm, i) => ({alarm, i})).filter(entry => entry.alarm.enabled);
+  if (!enabledAlarms.length) {
+    const item = document.createElement('li');
+    item.textContent = 'No active alarms';
+    list.replaceChildren(item);
+  } else list.replaceChildren(...enabledAlarms.map(({alarm, i}) => {
+    const item = document.createElement('li'), name = document.createElement('strong'), detail = document.createElement('span');
+    name.textContent = 'Alarm ' + (i + 1);
+    let remaining = 'Waiting for time sync';
+    if (clockAnchorMs !== null) {
+      const localSeconds = Math.floor((clockAnchorMs + 19800000 + performance.now() - clockAnchorAt) / 1000) % 86400;
+      const target = alarm.hour * 3600 + alarm.minute * 60;
+      let difference = target - localSeconds;
+      if (difference < 0) difference += 86400;
+      remaining = 'in ' + elapsed(difference);
+    }
+    detail.textContent = String(alarm.hour).padStart(2, '0') + ':' + String(alarm.minute).padStart(2, '0') +
+      ' · ' + (alarm.repeat ? 'Daily' : 'Once') + ' · ' + remaining;
+    item.append(name, detail);
+    return item;
+  }));
+}
+function pad(value) { return String(value).padStart(2, '0'); }
+function renderTimers() {
+  if (!data) return;
+  const delta = Math.max(0, performance.now() - receivedAt);
+  const stopwatch = Math.min(5999990, data.stopwatch_ms + (data.stopwatch_state === 1 ? delta : 0));
+  const centis = Math.floor(stopwatch / 10);
+  $('stopwatch-value').textContent = pad(Math.floor(centis / 6000)) + ':' + pad(Math.floor(centis / 100) % 60) + ':' + Math.floor(centis % 100 / 10);
+  const reminder = Math.max(0, Math.ceil((data.reminder_ms - (data.reminder_state === 1 ? delta : 0)) / 1000));
+  $('reminder-value').textContent = pad(Math.floor(reminder / 3600)) + ':' + pad(Math.floor(reminder / 60) % 60) + ':' + pad(reminder % 60);
+  const names = ['Stopped', 'Running', 'Paused', 'Ringing'];
+  for (const name of ['stopwatch', 'reminder']) {
+    const state = data[name + '_state'];
+    $(name + '-state').textContent = names[state] || 'Unknown';
+    $(name + '-start').textContent = state === 2 ? 'Resume' : 'Start';
+    $(name + '-start').disabled = timerBusy || !(state === 0 || state === 2) ||
+      (name === 'stopwatch' && state === 2 && data.stopwatch_ms >= 5999990);
+    $(name + '-pause').disabled = timerBusy || state !== 1;
+    $(name + '-stop').disabled = timerBusy || state === 0;
+  }
+  for (const id of reminderParts) $(id).disabled = data.reminder_state !== 0;
+  $('reminder-ringing').hidden = data.reminder_state !== 3;
+}
+function message(text, error = false) {
+  $('message').textContent = text;
+  $('message').classList.toggle('error', error);
+  $('message').hidden = !text;
+}
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  $('theme').value = theme;
+}
+try {
+  const savedTheme = localStorage.getItem('p10-theme');
+  setTheme([...$('theme').options].some(option => option.value === savedTheme) ? savedTheme : 'light');
+} catch (error) {
+  setTheme('light');
+  message('Theme preference could not be loaded from this browser.', true);
+}
+$('theme').onchange = () => {
+  const theme = $('theme').value;
+  setTheme(theme);
+  try {
+    localStorage.setItem('p10-theme', theme);
+  } catch (error) {
+    message('Theme changed, but this browser could not save the preference.', true);
+  }
+};
+async function refresh() {
+  if (refreshing) return false;
+  refreshing = true;
+  const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const requestStartedAt = performance.now();
+    const response = await fetch('/api/status', {cache:'no-store', signal:controller.signal});
+    if (!response.ok) throw Error('Status unavailable');
+    data = await response.json();
+    receivedAt = performance.now();
+    if (!data.time_valid || data.unix_time_ms === null) {
+      clockAnchorMs = null;
+    } else if (clockAnchorMs === null || receivedAt - lastClockSync >= 15000) {
+      clockAnchorMs = data.unix_time_ms;
+      clockAnchorAt = (requestStartedAt + receivedAt) / 2;
+      lastClockSync = receivedAt;
+    }
+    renderStatus();
+    if (!populated) {
+      fill($('settings'), data);
+      brightnessLabel();
+      fillAlarm();
+      $('settings').querySelector('fieldset').disabled = false;
+      $('alarm').querySelector('fieldset').disabled = false;
+      populated = true;
+    }
+    $('connection').classList.remove('offline');
+    $('connection-text').textContent = 'Live';
+    $('connection-warning').hidden = true;
+    return true;
+  } catch (error) {
+    $('connection').classList.add('offline');
+    $('connection-text').textContent = 'Disconnected';
+    $('connection-warning').hidden = false;
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    refreshing = false;
+  }
+}
+async function post(path, body) {
+  const response = await fetch(path, {method:'POST', body});
+  const result = await response.json();
+  if (!response.ok) throw Error(result.error || 'Request failed');
+}
+async function submit(button, work) {
+  button.disabled = true;
+  message('');
+  try { await work(); } catch (error) { message(error.message || 'Request failed', true); }
+  finally { button.disabled = false; }
+}
+for (const id of ['settings', 'alarm', 'wifi']) {
+  $(id).onsubmit = event => {
+    event.preventDefault();
+    const form = event.currentTarget, button = form.querySelector('button:not([type=button])');
+    submit(button, async () => {
+      let body = new URLSearchParams(new FormData(form));
+      if (id === 'wifi') {
+        const selected = $('wifi-networks').value;
+        const ssid = selected === 'hidden' ? $('wifi-hidden').value : decodeSSID(selected.slice(5));
+        if (!ssid) throw Error('Select a network or enter a hidden network name.');
+        body = new URLSearchParams({ssid, password:form.elements.password.value});
+      }
+      await post('/api/' + id, body);
+      if (id === 'wifi') { message('Wi-Fi saved. The device is rebooting.'); return; }
+      message(id === 'alarm' ? 'Alarm saved.' : 'Settings saved.');
+      await refresh();
+    });
+  };
+}
+$('settings').elements.brightness.oninput = brightnessLabel;
+$('alarm-index').onchange = fillAlarm;
+async function timerAction(name, action) {
+  if (!data || timerBusy) return;
+  const body = new URLSearchParams({timer:name, action});
+  if (name === 'reminder' && action === 'start') {
+    const seconds = Number($('reminder-hours').value) * 3600 +
+      Number($('reminder-minutes').value) * 60 + Number($('reminder-secs').value);
+    if (seconds < 1 || seconds > 86400) {
+      $('duration-picker').open = true;
+      message('Choose a reminder duration from 1 second to 24 hours.', true);
+      return;
+    }
+    body.set('seconds', seconds);
+  }
+  timerBusy = true;
+  renderTimers();
+  message('');
+  try {
+    await post('/api/timer', body);
+    await refresh();
+  } catch (error) {
+    message(error.message || 'Timer request failed', true);
+  } finally {
+    timerBusy = false;
+    renderTimers();
+  }
+}
+for (const name of ['stopwatch', 'reminder']) {
+  $(name + '-start').onclick = () => timerAction(name, data[name + '_state'] === 2 ? 'resume' : 'start');
+  $(name + '-pause').onclick = () => timerAction(name, 'pause');
+  $(name + '-stop').onclick = () => timerAction(name, 'stop');
+}
+$('reminder-dismiss').onclick = () => timerAction('reminder', 'stop');
+function decodeSSID(hex) {
+  return new TextDecoder('utf-8', {fatal:true}).decode(Uint8Array.from(hex.match(/../g) || [], byte => parseInt(byte, 16)));
+}
+async function scanNetworks() {
+  if (scanBusy) return;
+  scanBusy = true;
+  $('scan').disabled = true;
+  $('scan-message').textContent = 'Scanning nearby networks…';
+  try {
+    await post('/api/wifi/scan');
+    let result;
+    do {
+      await new Promise(resolve => setTimeout(resolve, 750));
+      const response = await fetch('/api/wifi/scan', {cache:'no-store'});
+      const value = await response.json();
+      if (!response.ok) throw Error(value.error || 'Scan failed');
+      result = value;
+    } while (result.state === 'running');
+    if (result.state !== 'done') throw Error('Scan did not complete');
+    const select = $('wifi-networks'), previous = select.value;
+    select.replaceChildren(new Option('Select a network', ''), new Option('Other / hidden network', 'hidden'));
+    for (const network of result.networks) {
+      let ssid;
+      try { ssid = decodeSSID(network.ssid_hex); } catch { continue; }
+      select.add(new Option(ssid + ' (' + network.rssi + ' dBm)', 'ssid:' + network.ssid_hex));
+    }
+    if ([...select.options].some(option => option.value === previous)) select.value = previous;
+    $('scan-message').textContent = result.networks.length ? 'Select a network or enter a hidden SSID.' : 'No networks found. Try scanning again.';
+  } catch (error) {
+    $('scan-message').textContent = error.message || 'Scan failed; retry.';
+  } finally {
+    scanBusy = false;
+    $('scan').disabled = false;
+  }
+}
+$('wifi-details').ontoggle = () => { if ($('wifi-details').open && $('wifi-networks').options.length === 2) scanNetworks(); };
+$('scan').onclick = scanNetworks;
+$('wifi-networks').onchange = () => {
+  const hidden = $('wifi-networks').value === 'hidden';
+  $('hidden-network').hidden = !hidden;
+  $('wifi-hidden').required = hidden;
+};
+$('stop').onclick = () => submit($('stop'), async () => {
+  await post('/api/alarm/stop');
+  message('Stop requested.');
+  setTimeout(refresh, 200);
+});
+$('reboot').onclick = () => submit($('reboot'), async () => {
+  await post('/api/reboot');
+  message('Device is rebooting.');
+});
+$('upload').onclick = () => submit($('upload'), async () => {
+  if (!$('firmware').files.length) throw Error('Select a firmware file first.');
+  message('Uploading firmware. Please wait.');
+  await post('/api/ota', $('firmware').files[0]);
+  message('Firmware uploaded. The device is rebooting.');
+});
+async function poll() { await refresh(); setTimeout(poll, 5000); }
+poll();
+setInterval(() => { renderClock(); renderAlarms(); }, 250);
+setInterval(renderTimers, 100);
+</script>
+</body>
+</html>

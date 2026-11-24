@@ -1,0 +1,56 @@
+menu "P10 clock hardware"
+
+    config CLOCK_PANEL_ENABLED
+        bool "Enable experimental 32x16 1/4-scan HUB12 panel driver"
+        default n
+        help
+            Enable only after confirming the panel scan, polarity and wiring.
+            The row/shift order may not match every HUB12 panel.
+
+    config CLOCK_OE_ACTIVE_LOW
+        bool "Output enable is active low"
+        default n
+        help
+            DMD2-compatible panels use an active-high enable. Enable this
+            option only if the physical panel requires an active-low enable.
+
+    config CLOCK_DATA_ACTIVE_LOW
+        bool "Panel data is active low"
+        default y
+
+    config CLOCK_PIN_DATA
+        int "Panel DATA GPIO (-1 means unconfigured)"
+        range -1 33
+        default -1
+
+    config CLOCK_PIN_CLOCK
+        int "Panel CLOCK GPIO (-1 means unconfigured)"
+        range -1 33
+        default -1
+
+    config CLOCK_PIN_LATCH
+        int "Panel LATCH GPIO (-1 means unconfigured)"
+        range -1 33
+        default -1
+
+    config CLOCK_PIN_OE
+        int "Panel output-enable GPIO (-1 means unconfigured)"
+        range -1 33
+        default -1
+
+    config CLOCK_PIN_A
+        int "Panel row A GPIO (-1 means unconfigured)"
+        range -1 33
+        default -1
+
+    config CLOCK_PIN_B
+        int "Panel row B GPIO (-1 means unconfigured)"
+        range -1 33
+        default -1
+
+    config CLOCK_PIN_BUZZER
+        int "Active buzzer GPIO (-1 means unconfigured)"
+        range -1 33
+        default -1
+
+endmenu

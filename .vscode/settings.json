@@ -1,0 +1,17 @@
+{
+    "idf.currentSetup": "/home/sudhir/.espressif/v6.1/esp-idf",
+    "idf.flashType": "UART",
+    "idf.openOcdConfigs": [
+        "interface/ftdi/esp_ftdi.cfg",
+        "target/esp32.cfg"
+    ],
+    "idf.customExtraVars": {},
+    "clangd.path": "/home/sudhir/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd",
+    "clangd.arguments": [
+      "--background-index",
+      "--query-driver=**",
+      "--compile-commands-dir=/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default"
+    ],
+    "idf.port": "/dev/ttyUSB0",
+    "idf.monitorPort": "/dev/ttyUSB0"
+}
