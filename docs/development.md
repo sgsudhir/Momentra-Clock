@@ -21,8 +21,8 @@ stable APIs.
 | [`main/idf_component.yml`](../main/idf_component.yml) | Managed mDNS component dependency |
 | [`tests/`](../tests/) | Host tests and NVS stubs |
 | [`CMakePresets.json`](../CMakePresets.json) | Separate development and production build directories |
-| [`installer/`](../installer/) | Browser installer source and pinned frontend dependencies |
-| [`pages.yml`](../.github/workflows/pages.yml) | Builds the factory image and deploys the installer |
+| [`installer/`](../installer/) | Portable local flasher source, launcher and pinned frontend dependencies |
+| [`release.yml`](../.github/workflows/release.yml) | Builds firmware and portable packages; publishes tagged releases |
 
 [`main/CMakeLists.txt`](../main/CMakeLists.txt) lists firmware modules and
 embeds the dashboard as a text resource. Updating HTML requires a firmware

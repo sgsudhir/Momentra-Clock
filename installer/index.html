@@ -3,70 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#111a36">
-  <title>Install Momentra Clock</title>
+  <title>Momentra ESP Flasher</title>
   <link rel="stylesheet" href="style.css">
-  <script type="module" src="esp-web-tools.js"></script>
-  <script type="module" src="app.js"></script>
 </head>
 <body>
 <main>
-  <header>
-    <a class="brand" href="https://github.com/sgsudhir/Momentra-Clock">◷ <span>Momentra Clock</span></a>
-    <a href="https://github.com/sgsudhir/Momentra-Clock/blob/main/docs/installation.md">Installation guide ↗</a>
-  </header>
-  <section class="hero">
-    <p class="eyebrow">YOUR CLOCK STARTS HERE</p>
-    <h1>Meet your moment.</h1>
-    <p>Install Momentra on your ESP32 and one 32 × 16 monochrome P10 HUB12 display in a few guided steps. No firmware tools needed for the first installation.</p>
-    <div class="pills"><span>Windows + Ubuntu</span><span>Chrome / Edge</span><span>Original ESP32 · 4 MB</span><span>1 × P10 · 32 × 16 · HUB12</span></div>
+  <header><span class="badge">OFFLINE • LOCAL</span><h1>Momentra ESP Flasher</h1>
+    <p>Install Momentra Clock or flash your own ESP firmware. Files and serial traffic stay on this computer.</p></header>
+  <section><h2>1. Prepare and connect</h2>
+    <p>Use Chrome or Edge and a USB data cable. Close serial monitors. On Ubuntu, serial-port permissions may be required. Some boards require holding BOOT while connecting.</p>
+    <p>Momentra requires an original ESP32 with 4 MB flash and one compatible 32 × 16 monochrome P10 HUB12 panel. Check wiring and power before connecting the display.</p>
+    <button id="connect" type="button">Connect device</button> <button id="disconnect" type="button" disabled>Disconnect</button>
+    <p id="device">No device connected</p>
   </section>
-
-  <section class="card">
-    <p class="eyebrow">BEFORE YOU BEGIN</p>
-    <h2>Get ready</h2>
-    <ol class="steps">
-      <li><strong>Check your board.</strong> Use an original ESP32 development board with at least 4 MB flash. ESP32-S2/S3/C3 and other variants are not supported by this image.</li>
-      <li><strong>Check your display.</strong> Use exactly one 32 × 16 monochrome P10 HUB12 panel with 1/4 scan and matching scan order and polarity. White, red, green, blue, yellow or pink single-color variants may work; compatibility depends on the panel, not its LED color. RGB/multicolor and multiple panels are not supported.</li>
-      <li><strong>Connect a data USB cable.</strong> Plug the board into your computer. Close serial monitors and other programs using the port. Install the board's USB-to-serial driver if necessary.</li>
-      <li><strong>Check the wiring.</strong> The factory firmware enables the panel and GPIO26 buzzer output. Verify the <a href="https://github.com/sgsudhir/Momentra-Clock/blob/main/docs/hardware.md">pinout and power circuit</a> before connecting them. For the official DevKitC, disconnect external board power before connecting USB.</li>
-    </ol>
-    <div class="warning" role="note">
-      <strong>First installation overwrites device data.</strong> This factory image overwrites the bootloader, partition table, OTA selection, app and the NVS area containing Wi-Fi credentials and settings, even if the installer's optional full-erase box is unchecked. It may make other stored data inaccessible. Back up anything needed and select the correct device.
+  <section><h2>2. Choose firmware</h2>
+    <label for="mode">Firmware</label>
+    <select id="mode"><option value="momentra">Momentra Clock factory image — original ESP32</option><option value="custom">Custom ESP firmware</option></select>
+    <p id="preset-warning" class="warning"><strong>Data loss:</strong> The factory image overwrites Wi-Fi credentials, alarms and other settings, even without whole-chip erase.</p>
+    <div id="custom" hidden><p>Choose binary files and offsets from your firmware provider. Each offset must be 4096-byte aligned. Only compatible ESP8266 and ESP32-family devices with a supported flasher stub and detectable flash can be used. Incorrect files or offsets can make a device unbootable.</p>
+      <div id="files"></div><button id="add-file" type="button">Add another file</button>
     </div>
-    <label class="consent"><input id="confirm" type="checkbox"> <span>I checked the board and wiring, and understand that this installation overwrites existing data.</span></label>
-    <p id="installer-status" class="status" role="status">Loading the installer and firmware…</p>
-    <div id="installer-controls" hidden>
-      <esp-web-install-button manifest="manifest.json">
-        <button id="connect" slot="activate" type="button" disabled>Connect &amp; install</button>
-        <span slot="unsupported">This browser cannot access the serial port. Use Chrome or Edge on Windows or Ubuntu.</span>
-        <span slot="not-allowed">Open this page over HTTPS or localhost to use serial access.</span>
-      </esp-web-install-button>
-    </div>
-    <p class="hint">Your browser asks you to choose and authorize the serial port. In the dialog choose <strong>Install Momentra Clock</strong>, review the erase option and follow the prompts. Keep the cable connected until installation completes.</p>
+    <label class="check"><input id="erase" type="checkbox"> Erase the entire flash before writing (destroys all device data)</label>
+    <p>Even without whole-chip erase, every sector touched by a selected file is erased and overwritten. Back up important data first.</p>
+    <label class="check"><input id="confirm" type="checkbox"> I understand the data-loss warning and have selected the correct device and firmware.</label>
+    <button id="flash" type="button" disabled>Review and flash</button>
   </section>
-
-  <section class="card">
-    <p class="eyebrow">AFTER INSTALLING</p>
-    <h2>Bring your clock online</h2>
-    <ol class="steps">
-      <li>If the board does not restart automatically, press its <strong>EN / RESET</strong> button.</li>
-      <li>On your phone or computer, join the open Wi-Fi network <strong>Momentra Clock</strong>. It has no password. If this network does not appear, see the troubleshooting section below.</li>
-      <li>Open <a href="http://192.168.4.1/">http://192.168.4.1/</a> in your browser. Open <strong>Wi-Fi setup</strong>, choose your home network, enter its password and select <strong>Save &amp; reboot</strong>.</li>
-      <li>Reconnect to your home network and try <a href="http://momentra.local/">http://momentra.local/</a>. If that does not work, find the clock's IP address in your router or serial logs. Allow time for Wi-Fi and NTP synchronization.</li>
-    </ol>
-    <div class="warning"><strong>Use a trusted, isolated network.</strong> Setup Wi-Fi is open and unencrypted; nearby clients can observe submitted credentials. The dashboard and API have no authentication or encryption.</div>
+  <section><h2>3. Status and setup</h2>
+    <p id="status" role="status" aria-live="polite">Connect a device to begin.</p>
+    <p>After installing Momentra, connect to the open <strong>Momentra Clock</strong> Wi-Fi network, visit <strong>http://192.168.4.1/</strong> and configure Wi-Fi. The setup network and dashboard are unencrypted and unauthenticated; use a trusted environment.</p>
+    <p>Keep this launcher running while using the page. Close its window or press Ctrl+C when finished.</p>
   </section>
-
-  <section class="card">
-    <p class="eyebrow">NEED A HAND?</p>
-    <h2>Common questions</h2>
-    <details><summary>No serial port or board found</summary><p>Try a known data cable and another USB port. Install the USB-to-serial driver for your board. On Ubuntu, check serial-port permissions and reconnect or sign in again after any permission change. Close other serial tools.</p></details>
-    <details><summary>Connection fails or times out</summary><p>Some boards need manual download mode: hold BOOT, press and release EN/RESET, then release BOOT; retry the connection. Board-specific sequences vary. Check the board manual.</p></details>
-    <details><summary>The setup network does not appear</summary><p>Wait for startup, press RESET and check power and serial logs. A device with retained valid credentials may connect to its saved network instead; this factory image normally overwrites NVS. Check the <a href="https://github.com/sgsudhir/Momentra-Clock/blob/main/docs/operations.md">troubleshooting guide</a>.</p></details>
-    <details><summary>Can I modify the firmware?</summary><p>Yes. Follow the <a href="https://github.com/sgsudhir/Momentra-Clock/blob/main/docs/installation.md#modify-build-and-upload">build and upload guide</a> to install ESP-IDF, edit the source, compile and flash your own build. Use the dashboard OTA feature only for a compatible application-only image.</p></details>
-  </section>
-  <footer>Browser installer powered by <a href="https://esphome.github.io/esp-web-tools/">ESP Web Tools</a> · <a href="licenses/esp-web-tools.txt">License</a> · <a href="https://github.com/sgsudhir/Momentra-Clock">Source</a></footer>
 </main>
+<script type="module" src="app.js"></script>
 </body>
 </html>

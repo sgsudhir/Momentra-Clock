@@ -12,14 +12,15 @@ For board selection, connector mapping, resistor calculations, a 2N2222
 buzzer-driver example and power guidance, read the
 [hardware and pinout guide](hardware.md) before assembling.
 
-## First installation with a browser
+## First installation with the portable flasher
 
-The [Momentra browser installer](https://sgsudhir.github.io/Momentra-Clock/)
-is intended for Windows and Ubuntu with Chrome or Edge on a secure HTTPS
-connection. It becomes available when the repository is pushed and
-[GitHub Pages is configured](#publish-the-browser-installer). The installer
-uses the original ESP32, 4 MB factory image built by the Pages workflow; it
-does not support other ESP32-family targets.
+Download a published package from [GitHub Releases](https://github.com/sgsudhir/Momentra-Clock/releases):
+the Windows x86-64 ZIP or Ubuntu x86-64 tar.gz. A release must exist before
+these packages can be downloaded. After download and extraction, the launcher,
+browser assets and Momentra image work offline. The launcher serves only
+`127.0.0.1` on a random port; leave its window open. The browser requests
+explicit serial-port permission. Chrome or Edge on Windows or Ubuntu is
+required; opening a local HTML file directly does not work.
 
 1. Read the [hardware guide](hardware.md). The factory image enables panel
    GPIOs and GPIO26 buzzer output; use safe, correctly wired hardware. Use
@@ -31,26 +32,47 @@ does not support other ESP32-family targets.
 2. Connect a data-capable USB cable to the ESP32 and computer. Install the
    appropriate USB-to-serial driver if the board does not appear; close
    serial monitors using the same port.
-3. Open the installer, read the data-loss warning and select its confirmation
-   checkbox. Select **Connect & install**, then choose the ESP32's serial
-   port in the browser permission dialog.
-4. Choose **Install Momentra Clock** in the dialog. Review the optional
-   whole-device erase prompt and follow the remaining prompts until the
-   operation completes. The factory image **always overwrites NVS**, even
-   when the optional whole-device erase is unchecked. Existing credentials,
-   settings and the previous partition layout can be lost; back up first.
+3. Extract the archive and run `momentra-flasher.exe` on Windows or
+   `./momentra-flasher` on Ubuntu. If needed, use
+   `chmod +x ./momentra-flasher` first. The launcher opens the default browser;
+   if it is not Chrome or Edge, copy the printed local URL into one of them.
+4. Select **Connect device** and choose the serial port. Check that the
+   detected chip is an original ESP32 with at least 4 MB flash. Select the
+   Momentra preset, read the warnings, check the confirmation box, and select
+   **Review and flash**. Confirm the displayed image and device. The factory
+   image **always overwrites NVS**, even when whole-device erase is unchecked.
+   Existing credentials, settings and the previous partition layout can be
+   lost; back up first. Wait for verification and reset.
 5. Press EN/RESET if needed. Follow the installer's on-screen instructions to
    connect to the open **Momentra Clock** AP and configure station Wi-Fi.
    The AP is unauthenticated and unencrypted; provision only in a trusted
    environment. Older installed firmware uses `P10-Clock-Setup` until updated.
 
-On Ubuntu, serial device permissions may need to be granted for the USB
+Close the launcher window or press Ctrl+C when finished. On Ubuntu, serial
+device permissions may need to be granted for the USB
 adapter and the user may need to sign in again. Some boards require holding
 BOOT while resetting to enter download mode. Check the board manual. Browser
-port selection is explicit; the installer detects the selected chip family
-and refuses unsupported chip families. The firmware does not implement
-Improv Wi-Fi provisioning: use the open setup AP, not the installer's serial
-Wi-Fi wizard.
+port selection is explicit. Momentra only supports the original ESP32;
+custom mode supports ESP8266 and ESP32-family chips implemented by the
+bundled `esptool-js` version with a working flasher stub and detectable flash,
+not all boards or chip configurations.
+The firmware does not implement Improv Wi-Fi provisioning: use the open
+setup AP.
+
+### Flash custom ESP firmware
+
+Select **Custom ESP firmware**, choose each binary and enter its decimal or
+hexadecimal flash offset. Offsets must be 4096-byte aligned. The flasher
+detects the flash size, rejects empty files, out-of-bounds files and
+overlapping erase sectors, and displays the detected chip and file list
+before confirmation. It does not determine whether custom binaries match
+the chip or partition layout; obtain correct files and offsets from their
+provider. Wrong files can make the device unbootable.
+
+Whole-chip erase is off by default. Even without it, each selected file
+erases its touched sectors, and custom files can overwrite credentials or
+other important data. Back up first. The flasher checks written data with MD5;
+this detects transfer errors, not malicious firmware.
 
 ## Modify, build and upload
 
@@ -71,24 +93,46 @@ binary (`build/production/ESP_P10_Clock_BLR.bin`) as an OTA update, not the
 merged factory image. Confirm active alarms and timers and follow
 [update and recovery](operations.md#firmware-update-and-recovery).
 
-## Publish the browser installer
+## Build and publish portable packages
 
-The repository maintainer must push the repository to GitHub and select
-**Settings → Pages → Build and deployment → Source: GitHub Actions**. The
-[`pages.yml`](../.github/workflows/pages.yml) workflow builds the browser
-bundle and the ESP-IDF 6.1 production firmware on pushes to `main` or by
-manual workflow dispatch, then deploys a Pages artifact. Configure Pages
-and Actions permissions according to the repository's settings. Check the
-workflow run for failures before sharing the URL.
+The [`release.yml`](../.github/workflows/release.yml) workflow builds the
+ESP-IDF 6.1 factory image, browser bundle, and Windows and Ubuntu x86-64
+launchers. Manual workflow dispatch creates an Actions artifact without
+publishing a release. Pushing a `v*` tag triggers the build and, if it
+succeeds, creates a GitHub Release with both archives and `SHA256SUMS.txt`.
+Review the source and verify the actual target hardware before creating a
+release tag. A passing build is not hardware validation. No GitHub Pages
+configuration is required.
 
 The factory image combines the bootloader, partition table, initial OTA
 metadata and app into one binary. Since it starts at offset zero, its filled
 gaps include the NVS area; do not describe it as a settings-preserving update.
 The workflow checks offsets and flash parameters against the ESP-IDF build
-output before deployment. Review changes and test on hardware before
-publishing: a successful build or Pages deployment is not hardware validation.
-The webpage and installer library are hosted on Pages; no cloud provisioning
-service is needed. Browser firmware downloads still require access to Pages.
+output before packaging. The bundled webpage, libraries and image are served
+locally; no cloud provisioning service is used.
+
+To build the launcher from source after building firmware with ESP-IDF, install
+Node.js/npm and Go 1.22 or later. From the repository root, using an activated
+ESP-IDF environment:
+
+```sh
+idf.py -B build/production -D SDKCONFIG="$PWD/build/production/sdkconfig" build
+mkdir -p build/release
+esptool --chip esp32 merge-bin --flash-mode dio --flash-size 4MB --flash-freq 40m \
+  -o build/release/momentra-factory.bin \
+  0x1000 build/production/bootloader/bootloader.bin \
+  0x8000 build/production/partition_table/partition-table.bin \
+  0xf000 build/production/ota_data_initial.bin \
+  0x20000 build/production/ESP_P10_Clock_BLR.bin
+npm ci --prefix installer
+sh installer/prepare-site.sh build/release/momentra-factory.bin
+(cd installer/launcher && go test ./... && go build -o momentra-flasher .)
+```
+
+These merge offsets and flash parameters assume the production defaults.
+If the firmware configuration changes, check `flasher_args.json` and the
+partition layout before using the merged image. The CI workflow enforces
+the expected production layout.
 
 ## 1. Prepare the equipment
 

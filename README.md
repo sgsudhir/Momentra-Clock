@@ -12,16 +12,20 @@ models and colors has not been verified.
 
 ## Install your clock
 
-### [Open the Momentra browser installer →](https://sgsudhir.github.io/Momentra-Clock/)
+### [Download the portable ESP flasher →](https://github.com/sgsudhir/Momentra-Clock/releases)
 
-On Windows or Ubuntu, use Chrome or Edge, connect an original ESP32 development
-board by USB and follow the guided steps. The installer writes a complete
-factory image and **overwrites the device's NVS settings and credentials**.
-Check the [wiring and power guide](docs/hardware.md) first.
+Download the Windows x86-64 ZIP or Ubuntu x86-64 tar.gz from a published
+release, extract it, and run the launcher. Keep its window open and follow the
+local page in Chrome or Edge. No internet is needed after downloading. The
+Momentra preset requires an original ESP32 with at least 4 MB flash and
+**overwrites saved settings and Wi-Fi credentials**. Check the
+[wiring and power guide](docs/hardware.md) first.
 
-The installer becomes available after this repository is pushed and
-[GitHub Pages is enabled](docs/installation.md#publish-the-browser-installer).
-Want to change the code? Follow the
+The portable packages are available only after a release is published; a build
+does not establish hardware compatibility. The flasher also supports custom
+ESP firmware and offsets, with separate data-loss warnings.
+For step-by-step help see [portable installation](docs/installation.md#first-installation-with-the-portable-flasher).
+Want to change the firmware? Follow the
 [modify, build and upload guide](docs/installation.md#modify-build-and-upload).
 
 > **Before deployment:** the setup network and dashboard are unauthenticated

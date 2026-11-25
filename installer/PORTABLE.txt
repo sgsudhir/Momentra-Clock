@@ -1,0 +1,26 @@
+Momentra ESP Flasher
+
+Extract the entire archive, then launch momentra-flasher.exe on Windows or
+momentra-flasher on 64-bit Ubuntu. If Ubuntu's file manager does not offer
+Run, open a terminal in the extracted folder and run:
+
+  chmod +x ./momentra-flasher
+  ./momentra-flasher
+
+Keep its window open. The launcher prints a local address and tries to open
+your default browser. If necessary, copy the address into Chrome or Edge.
+Internet access is not needed after download. Choose your USB serial device
+when the browser asks for permission. Install the board's USB driver or grant
+Ubuntu serial-port permissions if the device is not listed. Disconnect any
+serial monitor; some boards require holding BOOT while connecting.
+
+The Momentra factory image is only for an original ESP32 with 4 MB flash. It
+overwrites saved settings and Wi-Fi credentials even without whole-chip erase.
+The custom mode also erases every flash sector touched by your selected files;
+incorrect binaries or offsets can make a device unbootable. Back up first.
+
+Momentra requires one compatible 32 x 16 monochrome P10 HUB12 panel. Check
+power and wiring before use. After flashing, connect to the open "Momentra
+Clock" Wi-Fi network and visit http://192.168.4.1/ to configure station Wi-Fi.
+The setup network and dashboard are unencrypted and unauthenticated.
+Provision on a trusted network. Press Ctrl+C or close the launcher to exit.

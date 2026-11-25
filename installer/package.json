@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild node_modules/esp-web-tools/dist/web/install-button.js --bundle --format=esm --outfile=dist/esp-web-tools.js"
+    "build": "esbuild app.js --bundle --format=esm --outfile=dist/app.js"
   },
   "dependencies": {
-    "esp-web-tools": "10.5.2"
+    "esptool-js": "0.7.1",
+    "js-md5": "0.8.3"
   },
   "devDependencies": {
     "esbuild": "0.28.2"

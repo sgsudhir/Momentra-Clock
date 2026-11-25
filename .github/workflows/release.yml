@@ -1,18 +1,12 @@
-name: Build and publish installer
+name: Build portable flasher
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
   build:
@@ -24,7 +18,11 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: installer/package-lock.json
-      - name: Run host checks
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: installer/launcher/go.mod
+      - name: Run firmware host checks
         run: |
           cc -std=c11 -Wall -Wextra -Werror -I main \
             main/clock_config.c main/clock_schedule.c main/clock_freshness.c \
@@ -41,22 +39,15 @@ jobs:
             main/clock_timer_logic.c tests/test_clock_timers.c -o /tmp/clock-timers-test
           /tmp/clock-timers-test
           node tests/test_installer.mjs
-      - name: Build self-hosted web installer
+      - name: Build and verify factory image
         run: |
-          npm ci --prefix installer --no-audit --no-fund
-          npm run build --prefix installer
-          mkdir -p build/site/firmware build/site/licenses
-          cp installer/index.html installer/style.css installer/app.js installer/manifest.json build/site/
-          cp installer/dist/esp-web-tools.js build/site/
-          cp installer/node_modules/esp-web-tools/LICENSE build/site/licenses/esp-web-tools.txt
-      - name: Build and merge ESP32 production firmware
-        run: |
+          mkdir -p build/release
           docker run --rm -v "$GITHUB_WORKSPACE:/project" -w /project espressif/idf:v6.1 bash -c '
             set -eu
             git config --global --add safe.directory /project
             idf.py -B build/production -D SDKCONFIG=/project/build/production/sdkconfig build
             esptool --chip esp32 merge-bin --flash-mode dio --flash-size 4MB --flash-freq 40m \
-              -o build/site/firmware/momentra-factory.bin \
+              -o build/release/momentra-factory.bin \
               0x1000 build/production/bootloader/bootloader.bin \
               0x8000 build/production/partition_table/partition-table.bin \
               0xf000 build/production/ota_data_initial.bin \
@@ -74,17 +65,44 @@ jobs:
               "0x20000": "ESP_P10_Clock_BLR.bin"
             }
           ' build/production/flasher_args.json
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - name: Bundle and test launcher
+        run: |
+          npm ci --prefix installer --no-audit --no-fund
+          sh installer/prepare-site.sh build/release/momentra-factory.bin
+          cd installer/launcher
+          go test ./...
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o ../../build/release/momentra-flasher .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -o ../../build/release/momentra-flasher.exe .
+      - name: Package portable downloads
+        run: |
+          mkdir -p build/packages/linux build/packages/windows build/packages/assets
+          cp build/release/momentra-flasher build/packages/linux/
+          cp build/release/momentra-flasher.exe build/packages/windows/
+          cp installer/PORTABLE.txt build/packages/linux/README.txt
+          cp installer/PORTABLE.txt build/packages/windows/README.txt
+          tar -C build/packages/linux -czf build/packages/assets/momentra-flasher-ubuntu-x86_64.tar.gz .
+          (cd build/packages/windows && zip -q ../assets/momentra-flasher-windows-x86_64.zip ./*)
+          (cd build/packages/assets && sha256sum * > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
         with:
-          path: build/site
+          name: portable-flasher
+          path: build/packages/assets/*
+          if-no-files-found: error
 
-  deploy:
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: write
     steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: portable-flasher
+          path: release
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" release/* --verify-tag --title "$TAG" --generate-notes
