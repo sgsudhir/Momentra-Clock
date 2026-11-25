@@ -62,7 +62,8 @@ async function setup(chipName = "ESP32", stub = true, clipboard = {writeText: as
     navigator: {serial: {requestPort: async () => ({})}, clipboard},
     window: {confirm: text => { calls.push(text); return approved; }},
     fetch: async url => { fetches.push(url); return {ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer}; },
-    ESPLoader, Transport, md5: () => "hash", parseOffset, validateImages, validatePreset, Uint8Array
+    ESPLoader, Transport, md5: () => "hash", parseOffset, validateImages, validatePreset, Uint8Array,
+    initializeOTA: () => {}
   };
   vm.runInNewContext(source, context);
   await elements.connect.click();

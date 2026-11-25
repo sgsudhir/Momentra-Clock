@@ -51,6 +51,8 @@
 - The launcher, page and included firmware work offline after download.
 - Portable packages are available **only after a release is published**; a build does not establish hardware compatibility.
 - The flasher also supports custom ESP binaries and offsets, with separate data-loss warnings.
+- Its OTA card shows clock status and offers separate application images for wireless updates. Select the correct chip; never upload the merged factory image over OTA.
+- Select **Stop local server** in the flasher when finished, or close the launcher window.
 
 ### 2️⃣ Check, connect and install
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"flag"
@@ -12,17 +13,61 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sync"
 	"time"
 )
 
 //go:embed site
 var assets embed.FS
 
-func handler(files fs.FS, address string) http.Handler {
+func handler(files fs.FS, address string, stop func()) http.Handler {
 	static := http.FileServer(http.FS(files))
+	var otaLock sync.Mutex
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Host != address {
 			http.Error(w, "Invalid host", http.StatusForbidden)
+			return
+		}
+		if r.URL.Path == "/local/status" || r.URL.Path == "/local/ota" || r.URL.Path == "/local/stop" {
+			if r.Header.Get("Origin") != "http://"+address || r.Header.Get("X-Momentra-Request") != "1" {
+				http.Error(w, "Invalid request origin", http.StatusForbidden)
+				return
+			}
+			switch r.URL.Path {
+			case "/local/status":
+				if r.Method != http.MethodPost {
+					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
+				proxyClock(w, r, "/api/status")
+			case "/local/ota":
+				if r.Method != http.MethodPost {
+					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
+				if !otaLock.TryLock() {
+					http.Error(w, "An OTA update is already in progress", http.StatusConflict)
+					return
+				}
+				defer otaLock.Unlock()
+				proxyClock(w, r, "/api/ota")
+			case "/local/stop":
+				if r.Method != http.MethodPost {
+					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
+				if !otaLock.TryLock() {
+					http.Error(w, "Cannot stop while an OTA update is in progress", http.StatusConflict)
+					return
+				}
+				defer otaLock.Unlock()
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, "Server stopping")
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+				stop()
+			}
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -60,7 +105,21 @@ func main() {
 	}
 	address := listener.Addr().String()
 	url := "http://" + address + "/"
-	server := &http.Server{Handler: handler(site, address), ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{ReadHeaderTimeout: 5 * time.Second}
+	shutdownDone := make(chan struct{})
+	var shutdownOnce sync.Once
+	server.Handler = handler(site, address, func() {
+		shutdownOnce.Do(func() {
+			go func() {
+				defer close(shutdownDone)
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := server.Shutdown(ctx); err != nil {
+					log.Printf("Could not stop local server: %v", err)
+				}
+			}()
+		})
+	})
 	fmt.Printf("Momentra ESP Flasher: %s\nKeep this window open. Press Ctrl+C to exit.\n", url)
 	if !*noBrowser {
 		if err := openBrowser(url); err != nil {
@@ -70,4 +129,5 @@ func main() {
 	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
+	<-shutdownDone
 }

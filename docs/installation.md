@@ -22,6 +22,17 @@ browser assets and Momentra image work offline. The launcher serves only
 explicit serial-port permission. Chrome or Edge on Windows or Ubuntu is
 required; opening a local HTML file directly does not work.
 
+The expandable OTA card checks `momentra.local` automatically. If that fails,
+enter the clock's private IPv4 address and select **Connect**. It shows live
+status and offers bundled ESP32 and ESP32-S3 application images or a local
+application `.bin`. Select the correct chip and compatible partition layout;
+the clock does not report its chip model. Never upload a merged factory image
+via OTA. The clock must be in station-only mode; check alarms and timers before
+updating. The display blanks during the upload and the clock reboots. OTA is
+unencrypted and unauthenticated; use a trusted network. To stop the local
+server after operations finish, select **Stop local server**, close the
+launcher window, or press Ctrl+C.
+
 1. Read the [hardware guide](hardware.md). Each factory image enables panel
    GPIOs and a target-specific buzzer output; use safe, correctly wired hardware. Use
    **one** 32 × 16 monochrome P10 HUB12 panel with 1/4 scan and matching
@@ -156,7 +167,8 @@ esptool --chip esp32s3 merge-bin --flash-mode dio --flash-size 4MB --flash-freq 
   0xf000 build/production-s3/ota_data_initial.bin \
   0x20000 build/production-s3/ESP_P10_Clock_BLR.bin
 npm ci --prefix installer
-sh installer/prepare-site.sh build/release/momentra-factory.bin build/release/momentra-s3-factory.bin
+sh installer/prepare-site.sh build/release/momentra-factory.bin build/release/momentra-s3-factory.bin \
+  build/production/ESP_P10_Clock_BLR.bin build/production-s3/ESP_P10_Clock_BLR.bin
 (cd installer/launcher && go test ./... && go build -o momentra-flasher .)
 ```
 

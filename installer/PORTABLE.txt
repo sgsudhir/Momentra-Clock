@@ -14,6 +14,14 @@ when the browser asks for permission. Install the board's USB driver or grant
 Ubuntu serial-port permissions if the device is not listed. Disconnect any
 serial monitor. If connection fails, see the BOOT / RESET guide on the page.
 
+For wireless updates, open the OTA card. It checks momentra.local; if that
+fails, enter the clock's private IPv4 address and select Connect. Choose the
+bundled application for the correct chip, or provide a compatible application
+.bin. Do not upload a factory/merged image over OTA. Check alarms and timers,
+and keep power and network connected until the update and reboot complete.
+The clock must be connected in station-only mode. OTA and the clock dashboard
+are unauthenticated and unencrypted; use a trusted network.
+
 The Momentra factory images support an original ESP32 or ESP32-S3 with at
 least 4 MB flash. The S3 image uses the ESP32-S3-DevKitC-1 N16R8 pin mapping;
 check that the actual board and wiring match it. The installer selects the
@@ -27,4 +35,5 @@ power and wiring before use. After flashing and verification, release BOOT
 and press EN / RESET once to start normally. Connect to the open "Momentra
 Clock" Wi-Fi network and visit http://192.168.4.1/ to configure station Wi-Fi.
 The setup network and dashboard are unencrypted and unauthenticated.
-Provision on a trusted network. Press Ctrl+C or close the launcher to exit.
+Provision on a trusted network. After operations finish, use Stop local server
+on the page, press Ctrl+C, or close the launcher to exit.

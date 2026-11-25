@@ -9,6 +9,10 @@
 body { margin: 0; background: radial-gradient(ellipse at 70% 0, #17304a 0, #080e1a 52rem); }
 .shell { max-width: 1160px; margin: auto; padding: 2rem 1.25rem 3rem; }
 .hero { position: relative; overflow: hidden; min-height: 335px; padding: 1.8rem 2.4rem 2.4rem; margin-bottom: 1.25rem; border: 1px solid #2e5363; border-radius: 20px; background: linear-gradient(120deg, #10243a 10%, #123a43 70%, #1c524d); }
+.hero-bar { position: relative; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.server-controls { display: flex; flex-direction: column; align-items: flex-end; gap: .4rem; max-width: 290px; margin-left: auto; }
+.server-controls button { white-space: nowrap; }
+.server-controls span { color: #d7f4e8; font-size: .75rem; text-align: right; }
 .brand { position: relative; z-index: 1; display: flex; align-items: center; gap: .7rem; font-size: .75rem; font-weight: 800; letter-spacing: .12em; }
 .brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; color: #0a2426; background: #82e9ca; font-size: .9rem; }
 .brand-light { color: #a7bccb; font-weight: 500; }
@@ -99,6 +103,29 @@ tbody th { color: #e7f1f8; font-weight: 600; }
 tbody td { color: #bfe9db; font-family: ui-monospace, monospace; }
 tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
 .pinout > p:last-child { margin: 1rem 0 0; }
+.ota-card { border-color: #3a706c; background: linear-gradient(130deg, #112b36, #122238 65%); }
+.ota-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; cursor: pointer; list-style: none; }
+.ota-summary::-webkit-details-marker { display: none; }
+.ota-summary-title { display: flex; align-items: center; gap: .9rem; }
+.ota-summary-title strong, .ota-summary-title small, .ota-summary-title .eyebrow { display: block; }
+.ota-summary-title strong { font-size: 1.25rem; }
+.ota-summary-title small { color: #a9bdcc; }
+.ota-connection { flex-shrink: 0; padding: .35rem .75rem; border: 1px solid #576d75; border-radius: 999px; color: #c4d2da; font-size: .75rem; font-weight: 800; }
+.ota-connection::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: .4rem; border-radius: 50%; background: currentColor; }
+.ota-connection.live { color: #8df0ca; border-color: #3e8b76; background: #193d38; }
+.ota-connection.connecting { color: #ffda9d; }
+.ota-content { margin-top: 1.35rem; }
+.ota-target { display: flex; align-items: end; gap: .6rem; margin-bottom: 1rem; }
+.ota-target > div { flex: 1; }
+.ota-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .65rem; }
+.ota-stats > div { padding: .8rem; border: 1px solid #315260; border-radius: 10px; background: #0c202c; overflow-wrap: anywhere; }
+.ota-stats span, .ota-stats strong { display: block; }
+.ota-stats span { color: #a9bdcc; font-size: .75rem; }
+.ota-stats strong { color: #ddfff2; font-size: .95rem; }
+.ota-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .8rem; }
+.ota-result { margin: .75rem 0 0; color: #d7f4e8; overflow-wrap: anywhere; }
+.ota-result:empty { display: none; }
+.ota-summary:focus-visible { outline: 3px solid #d5fff3; outline-offset: 5px; }
 footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .75rem; color: #93aab9; font-size: .75rem; }
 footer > span:first-child { font-weight: 800; letter-spacing: .1em; }
 [hidden] { display: none !important; }
@@ -107,6 +134,7 @@ footer > span:first-child { font-weight: 800; letter-spacing: .1em; }
   .hero { min-height: auto; padding: 1.5rem; }
   .hero-content { margin-top: 1.5rem; }
   .hero-art { display: none; }
+  .hero-bar { flex-wrap: wrap; }
   .card { padding: 1.2rem; }
   .support-grid, .help-grid, .work-grid { grid-template-columns: 1fr; }
   .guide-columns { grid-template-columns: 1fr; gap: .5rem; }

@@ -50,6 +50,7 @@ jobs:
           /tmp/clock-pins-s3
           node tests/test_dashboard.mjs
           node tests/test_installer.mjs
+          node tests/test_installer_ota.mjs
       - name: Build and verify factory image
         run: |
           mkdir -p build/release
@@ -99,7 +100,8 @@ jobs:
       - name: Bundle and test launcher
         run: |
           npm ci --prefix installer --no-audit --no-fund
-          sh installer/prepare-site.sh build/release/momentra-factory.bin build/release/momentra-s3-factory.bin
+          sh installer/prepare-site.sh build/release/momentra-factory.bin build/release/momentra-s3-factory.bin \
+            build/production/ESP_P10_Clock_BLR.bin build/production-s3/ESP_P10_Clock_BLR.bin
           cd installer/launcher
           go test ./...
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o ../../build/release/momentra-flasher .

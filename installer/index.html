@@ -10,7 +10,10 @@
 <body>
 <main class="shell">
   <header class="hero">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">M</span><span>MOMENTRA <span class="brand-light">/ ESP FLASHER</span></span></div>
+    <div class="hero-bar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">M</span><span>MOMENTRA <span class="brand-light">/ ESP FLASHER</span></span></div>
+      <div class="server-controls"><button id="stop-server" class="secondary" type="button">Stop local server</button><span id="stop-message" role="status" aria-live="polite"></span></div>
+    </div>
     <div class="hero-content">
       <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> LOCAL &amp; OFFLINE</p>
       <h1>Bring your device<br><span>to life.</span></h1>
@@ -19,6 +22,33 @@
     </div>
     <div class="hero-art" aria-hidden="true"><div class="clock-face"><span>12<span class="colon">:</span>34</span><small>YOUR NEXT PROJECT STARTS HERE</small></div></div>
   </header>
+
+  <details class="card ota-card" id="ota-card">
+    <summary class="ota-summary">
+      <span class="ota-summary-title"><span class="step-icon" aria-hidden="true">↻</span><span><span class="eyebrow">WIRELESS DEVICE MAINTENANCE</span><strong>Momentra Clock OTA update</strong><small>Live status &amp; firmware updates over Wi-Fi</small></span></span>
+      <span id="ota-connection" class="ota-connection connecting" role="status" aria-live="polite">Connecting</span>
+    </summary>
+    <div class="ota-content">
+      <p>Connect this computer and your clock to the same trusted network. The flasher checks <strong>momentra.local</strong> automatically. If it cannot connect, enter the clock's private IPv4 address and select Connect.</p>
+      <div class="ota-target"><div><label class="field-label" for="ota-host">CLOCK ADDRESS</label><input id="ota-host" type="text" value="momentra.local" autocomplete="off" spellcheck="false"></div><button id="ota-connect" class="secondary" type="button">Connect</button></div>
+      <p id="ota-message" class="status-box" role="status" aria-live="polite">Connecting to momentra.local…</p>
+      <div class="ota-stats">
+        <div><span>Firmware</span><strong id="ota-version">—</strong></div><div><span>Clock address</span><strong id="ota-ip">—</strong></div>
+        <div><span>Uptime</span><strong id="ota-uptime">—</strong></div><div><span>Wi-Fi signal</span><strong id="ota-rssi">—</strong></div>
+        <div><span>Brightness</span><strong id="ota-brightness">—</strong></div><div><span>Alarms enabled</span><strong id="ota-alarms">—</strong></div>
+        <div><span>Hourly sound</span><strong id="ota-hourly">—</strong></div><div><span>Time / display</span><strong id="ota-health">—</strong></div>
+        <div><span>Free memory</span><strong id="ota-memory">—</strong></div><div><span>Clock identity</span><strong id="ota-chip">—</strong></div>
+      </div>
+      <div class="notice warning"><strong>Choose the correct application image.</strong><p>Confirm your exact chip and compatible partition layout. Never upload a factory/merged image. OTA blanks the display and reboots the clock; check alarms and timers first. HTTP is unauthenticated and unencrypted; use a trusted network.</p></div>
+      <div class="ota-controls">
+        <div><label class="field-label" for="ota-source">APPLICATION IMAGE</label><select id="ota-source"><option value="">Select an image</option><option value="esp32">Bundled Momentra — original ESP32</option><option value="esp32s3">Bundled Momentra — ESP32-S3</option><option value="custom">Choose application .bin file</option></select></div>
+        <div id="ota-file-row" hidden><label class="field-label" for="ota-file">APPLICATION .BIN</label><input id="ota-file" type="file" accept=".bin,application/octet-stream"></div>
+      </div>
+      <label class="check"><input id="ota-confirm" type="checkbox"><span>I verified the target chip, application image and partition layout, and checked alarms and timers.</span></label>
+      <button id="ota-upload" class="primary" type="button" disabled>Review and update clock →</button>
+      <p id="ota-result" class="ota-result" role="status" aria-live="polite"></p>
+    </div>
+  </details>
 
   <section class="card compatibility" aria-labelledby="supported-title">
     <div class="section-heading"><span class="step-icon" aria-hidden="true">01</span><div><p class="eyebrow">KNOW YOUR DEVICE</p><h2 id="supported-title">Supported MCUs</h2></div></div>
@@ -114,7 +144,7 @@
     </tbody></table></div>
     <p class="muted small">Use a suitable external buzzer driver, common ground, a correctly rated panel supply and level shifting where needed. Never power a panel or buzzer directly from a GPIO. The S3 mapping and display still need panel testing.</p>
   </section>
-  <footer><span>MOMENTRA <span class="brand-light">/ ESP FLASHER</span></span><span>Local by design · Close the launcher or press Ctrl+C when finished</span></footer>
+  <footer><span>MOMENTRA <span class="brand-light">/ ESP FLASHER</span></span><span>Local by design</span></footer>
 </main>
 <script type="module" src="app.js"></script>
 </body>

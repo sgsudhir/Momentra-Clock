@@ -1,6 +1,7 @@
 import { ESPLoader, Transport } from "esptool-js";
 import md5 from "js-md5";
 import { parseOffset, validateImages, validatePreset } from "./validation.mjs";
+import { initializeOTA } from "./ota.js";
 
 const $ = id => document.getElementById(id);
 let transport;
@@ -173,3 +174,4 @@ $("copy-command").addEventListener("click", async () => {
 addRow();
 if (!("serial" in navigator)) status("Web Serial is unavailable. Open this local address in Chrome or Edge on Windows or Ubuntu.", true);
 update();
+initializeOTA(() => busy);
