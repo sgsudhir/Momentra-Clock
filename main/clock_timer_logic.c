@@ -2,6 +2,8 @@
 
 int64_t clock_timer_value(const clock_timer_t *timer, bool countdown, int64_t now)
 {
+    /* value_us is the value at mark_us, not a value updated on every tick.
+     * Clamp negative deltas to zero and the result to the relevant limit. */
     int64_t delta = now > timer->mark_us ? now - timer->mark_us : 0;
     if (timer->state != TIMER_RUNNING) return timer->value_us;
     if (countdown) return delta >= timer->value_us ? 0 : timer->value_us - delta;
@@ -52,6 +54,8 @@ bool clock_timers_tick(clock_timers_t *timers, int64_t now)
     }
     clock_timer_t *rem = &timers->reminder;
     if (rem->state == TIMER_RUNNING && clock_timer_value(rem, true, now) == 0) {
+        /* Anchor ringing to the actual countdown deadline, not the later tick,
+         * so delayed task scheduling does not extend the 15-second ring. */
         rem->mark_us += rem->value_us;
         rem->value_us = 0;
         rem->state = TIMER_RINGING;

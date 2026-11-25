@@ -14,16 +14,19 @@
 #include "sdkconfig.h"
 
 static const char *TAG = "clock_alarm";
+/* The alarm task owns the buzzer. Other tasks exchange its status and
+ * coalesced requests through this lock; requests are consumed once. */
 static portMUX_TYPE status_lock = portMUX_INITIALIZER_UNLOCKED;
 static clock_alarm_status_t status;
-static bool stop_requested;
-static bool beep_requested;
+static bool stop_requested; /* Stop the current alarm/chime at the next tick. */
+static bool beep_requested; /* Pending short confirmation, not a counted queue. */
 
 bool clock_alarm_is_configured(void)
 {
     return CONFIG_CLOCK_PIN_BUZZER >= 0;
 }
 
+/** Publish whether scheduled alarm slots are ringing and their bitmask. */
 static void set_status(bool ringing, uint8_t mask)
 {
     portENTER_CRITICAL(&status_lock);
@@ -58,6 +61,7 @@ void clock_alarm_beep(void)
     portEXIT_CRITICAL(&status_lock);
 }
 
+/** Atomically consume the pending confirmation request; return whether present. */
 static bool take_beep_request(void)
 {
     portENTER_CRITICAL(&status_lock);
@@ -67,6 +71,7 @@ static bool take_beep_request(void)
     return result;
 }
 
+/** Atomically consume the pending stop request; return whether present. */
 static bool take_stop_request(void)
 {
     portENTER_CRITICAL(&status_lock);
@@ -76,6 +81,7 @@ static bool take_stop_request(void)
     return result;
 }
 
+/** Set the active buzzer level when configured; log GPIO errors. */
 static void buzzer_write(bool on)
 {
     if (CONFIG_CLOCK_PIN_BUZZER >= 0) {
@@ -86,18 +92,21 @@ static void buzzer_write(bool on)
     }
 }
 
+/** FreeRTOS worker for schedules, timers and buzzer arbitration.
+ * @param arg Unused task argument. The task runs until device restart.
+ */
 static void alarm_task(void *arg)
 {
     (void)arg;
     clock_schedule_t schedule;
     clock_schedule_init(&schedule);
-    int64_t sound_start = 0;
-    int64_t sound_end = 0;
-    uint8_t active_alarms = 0;
-    unsigned pattern = 0;
-    bool previous_output = false;
-    int64_t feedback_end = 0;
-    int64_t reminder_start = -1;
+    int64_t sound_start = 0;    /* Monotonic start of active alarm/chime. */
+    int64_t sound_end = 0;      /* Monotonic end of active alarm/chime. */
+    uint8_t active_alarms = 0;  /* Bitmask; zero means sound is a chime. */
+    unsigned pattern = 0;       /* Chime rhythm selected at its start. */
+    bool previous_output = false; /* Avoid redundant GPIO writes. */
+    int64_t feedback_end = 0;   /* Deadline for the short confirmation beep. */
+    int64_t reminder_start = -1; /* Monotonic start of reminder sound, or absent. */
 
     while (true) {
         int64_t now = esp_timer_get_time();
@@ -151,6 +160,8 @@ static void alarm_task(void *arg)
         }
         set_status(active_alarms != 0, active_alarms);
 
+        /* Priority: alarm/chime, then reminder, then queued feedback. A new
+         * scheduled alarm takes precedence over an already active chime. */
         bool output = false;
         if (now < sound_end) {
             if (active_alarms) {

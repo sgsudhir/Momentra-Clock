@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+/** Decode one ASCII hexadecimal digit; return -1 for any other character. */
 static int hex_digit(char c)
 {
     if (c >= '0' && c <= '9') return c - '0';
@@ -12,6 +13,9 @@ static int hex_digit(char c)
     return -1;
 }
 
+/** Decode one bounded form component into out, including its terminating NUL.
+ * Return false for invalid escapes, embedded NUL or insufficient capacity.
+ */
 static bool decode(const char *source, size_t length, char *out, size_t capacity)
 {
     size_t pos = 0;
@@ -50,6 +54,7 @@ bool clock_form_parse(clock_form_t *form, const char *body, size_t length)
             !decode(equal + 1, end - equal - 1, field->value, sizeof(field->value))) {
             return false;
         }
+        /* Compare decoded names so aliases such as "a" and "%61" collide. */
         for (size_t i = 0; i < form->count; ++i) {
             if (strcmp(form->fields[i].name, field->name) == 0) return false;
         }

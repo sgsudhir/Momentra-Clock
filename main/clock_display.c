@@ -33,23 +33,28 @@ static const char *TAG = "clock_display";
 #else
 #define DATA_INVERTED 0
 #endif
+/* The core-0 renderer publishes complete frames; the core-1 scanner copies
+ * one frame at row zero and keeps it for all four addresses. This prevents
+ * partially rendered frames from being shown during a scan. */
 static spi_device_handle_t spi;
 static EventGroupHandle_t display_events;
 static portMUX_TYPE pause_lock = portMUX_INITIALIZER_UNLOCKED;
 static portMUX_TYPE frame_lock = portMUX_INITIALIZER_UNLOCKED;
 static clock_frame_t rendered_frame;
 static unsigned rendered_brightness;
-static bool paused;
-static bool ready;
+static bool paused; /* Requested pause state, protected by pause_lock. */
+static bool ready;  /* Scanner health/startup state, protected by pause_lock. */
 #define DISPLAY_PAUSED BIT0
 #define DISPLAY_RUNNING BIT1
 
+/** Reject non-output, boot-strapping, serial and flash-reserved GPIOs. */
 static bool pin_safe(int pin)
 {
     return GPIO_IS_VALID_OUTPUT_GPIO(pin) && pin != 0 && pin != 1 && pin != 2 &&
            pin != 3 && pin != 5 && !(pin >= 6 && pin <= 12) && pin != 15;
 }
 
+/** Check panel pins are safe, unique and do not conflict with the buzzer. */
 static bool pins_valid(void)
 {
     int pins[] = {CONFIG_CLOCK_PIN_DATA, CONFIG_CLOCK_PIN_CLOCK, CONFIG_CLOCK_PIN_LATCH,
@@ -63,6 +68,7 @@ static bool pins_valid(void)
     return true;
 }
 
+/** Read the requested pause state under its lock. */
 static bool is_paused(void)
 {
     portENTER_CRITICAL(&pause_lock);
@@ -79,6 +85,7 @@ bool clock_display_is_ready(void)
     return result;
 }
 
+/** Publish panel readiness under its lock. */
 static void set_ready(bool value)
 {
     portENTER_CRITICAL(&pause_lock);
@@ -98,6 +105,12 @@ esp_err_t clock_display_pause(bool pause)
     return (bits & expected) ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
+/** Shift one multiplexed row group, latch it while blanked, then restore PWM.
+ * @param frame Stable logical frame for this scan.
+ * @param row Panel address 0-3.
+ * @param brightness Percent, 0-100.
+ * @return First SPI/GPIO/PWM error or ESP_OK.
+ */
 static esp_err_t refresh_row(const clock_frame_t *frame, unsigned row, unsigned brightness)
 {
     uint8_t bytes[16];
@@ -114,6 +127,9 @@ static esp_err_t refresh_row(const clock_frame_t *frame, unsigned row, unsigned 
     return ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
 
+/** Core-0 worker composing frames independently of the time-critical scanner.
+ * @param arg Unused. Runs until display readiness is cleared.
+ */
 static void render_task(void *arg)
 {
     (void)arg;
@@ -124,6 +140,7 @@ static void render_task(void *arg)
         clock_timers_snapshot_t timers = clock_timers_snapshot();
         bool stopwatch = timers.stopwatch_state == TIMER_RUNNING;
         bool reminder = timers.reminder_state == TIMER_RUNNING || timers.reminder_state == TIMER_RINGING;
+        /* Running timers take priority over connection screens and clock time. */
         if (stopwatch) {
             uint64_t centis = timers.stopwatch_us / 10000;
             clock_render_timer(&frame, false, centis / 6000, centis / 100 % 60,
@@ -162,6 +179,9 @@ static void render_task(void *arg)
     vTaskDelete(NULL);
 }
 
+/** Core-1 panel scan worker.
+ * @param arg Unused. Acknowledges pauses and stops on a hardware error.
+ */
 static void display_task(void *arg)
 {
     (void)arg;
@@ -184,6 +204,7 @@ static void display_task(void *arg)
         }
         xEventGroupClearBits(display_events, DISPLAY_PAUSED);
         xEventGroupSetBits(display_events, DISPLAY_RUNNING);
+        /* Switch frames only on a full-scan boundary. */
         if (row == 0) {
             portENTER_CRITICAL(&frame_lock);
             frame = rendered_frame;

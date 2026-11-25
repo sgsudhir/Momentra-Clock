@@ -10,9 +10,15 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 
+/* The SNTP callback and readers can run in different tasks. Keep the critical
+ * section short: it protects only the monotonic timestamp, not wall time. */
 static portMUX_TYPE sync_lock = portMUX_INITIALIZER_UNLOCKED;
-static int64_t last_sync_us = -1;
+static int64_t last_sync_us = -1; /* -1 means no successful sync since boot. */
 
+/** Record a successful SNTP update.
+ * @param time_value Time supplied by ESP-IDF; wall time is read separately.
+ * @return Nothing. Called by the SNTP subsystem.
+ */
 static void on_time_sync(struct timeval *time_value)
 {
     (void)time_value;
@@ -24,6 +30,8 @@ static void on_time_sync(struct timeval *time_value)
 
 esp_err_t clock_time_init(void)
 {
+    /* POSIX TZ signs are reversed: IST-5:30 denotes UTC+05:30. SNTP is
+     * initialized now but started only after the station obtains an IP. */
     if (setenv("TZ", "IST-5:30", 1) != 0) {
         return ESP_FAIL;
     }
@@ -47,6 +55,8 @@ clock_time_snapshot_t clock_time_snapshot(void)
     portEXIT_CRITICAL(&sync_lock);
     int64_t now_us = esp_timer_get_time();
 
+    /* Freshness uses monotonic time so an NTP correction cannot make an old
+     * synchronization appear new. gettimeofday() supplies the wall time. */
     clock_time_snapshot_t result = {
         .valid = clock_sync_is_fresh(sync_us, now_us),
         .sync_age_seconds = sync_us < 0 || now_us < sync_us ? -1 : (now_us - sync_us) / 1000000,

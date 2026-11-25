@@ -1,12 +1,62 @@
 # Momentra Clock
 
-ESP-IDF application for an ESP32-WROOM-32 with 4 MB flash, a single monochrome
-32x16 HUB12 panel and an active buzzer. The panel driver is experimental and
-enabled in the project configuration for testing: its wiring, scan order and
-DATA polarity have not been verified on the user's hardware. The firmware and web
-interface have not yet been hardware-tested.
+**A local-first clock for an ESP32 and one 32 × 16 monochrome P10 HUB12 panel.**
+Momentra combines an NTP-synchronized display, persistent alarms, a buzzer,
+stopwatch and reminder with a small browser dashboard and HTTP API.
+
+The panel may be a single-color white, red, green, blue, yellow or pink
+variant, provided its HUB12 interface, 1/4 scan, polarity and scan order match
+the driver. The LED color is fixed by the panel; RGB/multicolor and chained
+or multiple panels are not supported. Compatibility of individual panel
+models and colors has not been verified.
+
+## Install your clock
+
+### [Open the Momentra browser installer →](https://sgsudhir.github.io/Momentra-Clock/)
+
+On Windows or Ubuntu, use Chrome or Edge, connect an original ESP32 development
+board by USB and follow the guided steps. The installer writes a complete
+factory image and **overwrites the device's NVS settings and credentials**.
+Check the [wiring and power guide](docs/hardware.md) first.
+
+The installer becomes available after this repository is pushed and
+[GitHub Pages is enabled](docs/installation.md#publish-the-browser-installer).
+Want to change the code? Follow the
+[modify, build and upload guide](docs/installation.md#modify-build-and-upload).
+
+> **Before deployment:** the setup network and dashboard are unauthenticated
+> and unencrypted. The panel driver is hardware-specific, and the latest
+> display redesign has not been physically verified. Read the
+> [security and installation guide](docs/installation.md) before powering or
+> exposing a device.
+
+## Documentation map
+
+| Start here | What you will find |
+| --- | --- |
+| [Wiki home](docs/README.md) | Guided paths, overview and documentation index |
+| [Installation and deployment](docs/installation.md) | Wiring, build, first flash, provisioning, security and release checklist |
+| [Hardware and pinout](docs/hardware.md) | Compatible boards, panel signals, power and 2N2222 buzzer circuit |
+| [Dashboard guide](docs/dashboard.md) | Illustrated, step-by-step controls and everyday use |
+| [HTTP API reference](docs/api.md) | Endpoints, parameters, examples, errors and status fields |
+| [Architecture and flows](docs/architecture.md) | Startup, cores, task scheduling, data flow and synchronization |
+| [Developer reference](docs/development.md) | Module and function map, persistence, tests and maintenance |
+| [Operations and troubleshooting](docs/operations.md) | Symptoms, recovery, OTA and hardware verification |
+
+The remainder of this README is a compact operational reference. The wiki
+describes the current source, not a guarantee of regulatory, safety,
+accessibility or production certification.
+
+ESP-IDF application for an ESP32-WROOM-32 with 4 MB flash, one monochrome
+32x16 P10 HUB12 panel and an active buzzer. Earlier firmware has been used on the
+user's hardware, but the latest display redesign has not been uploaded or
+physically verified. The panel driver remains hardware-specific; independently
+confirm wiring, scan order and DATA polarity for each panel.
 
 ## Safety and wiring
+
+For the detailed pinout, example circuits and power checks, see the
+[hardware guide](docs/hardware.md).
 
 - Confirm the panel's 1/4 scan pattern, HUB12 connector pinout, active level
   for DATA, and active-buzzer circuit before connecting the panel. The user
@@ -88,11 +138,12 @@ Do not flash the panel-enabled build until the physical wiring has been checked.
 ## Wi-Fi, security and time
 
 On first boot, or after five failed connection attempts, the device provides an
-**open** AP named `P10-Clock-Setup`. Connect to it and open
+**open** AP named `Momentra Clock`. Connect to it and open
 `http://192.168.4.1/` to enter station credentials. The device saves the
 candidate credentials and reboots. Successful credentials replace the
 previous saved credentials; a failed connection returns to the setup AP and
 retries periodically. The station IP is logged on the serial console.
+Older firmware still broadcasts `P10-Clock-Setup` until it is updated.
 The Wi-Fi setup section scans for nearby broadcast SSIDs and shows their RSSI;
 use the hidden-network option for an unadvertised SSID. Scanning may briefly
 interrupt Wi-Fi traffic, and a scan can fail while the station is connecting;

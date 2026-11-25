@@ -22,11 +22,17 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+/* The build embeds the dashboard as a binary resource; the linker provides
+ * these bounds, including an extra terminating byte at the end. */
 extern const char web_index_start[] asm("_binary_index_html_start");
 extern const char web_index_end[] asm("_binary_index_html_end");
 
 static const char *TAG = "clock_web";
 
+/** Read and parse a bounded URL-encoded request body.
+ * @param req HTTP request; @param form Parsed destination.
+ * @return False for an empty, oversized, interrupted or malformed body.
+ */
 static bool read_form(httpd_req_t *req, clock_form_t *form)
 {
     if (req->content_len <= 0 || req->content_len > 1024) return false;
@@ -40,6 +46,7 @@ static bool read_form(httpd_req_t *req, clock_form_t *form)
     return clock_form_parse(form, body, used);
 }
 
+/** Send a JSON error using the supplied HTTP status and fixed message. */
 static esp_err_t json_error(httpd_req_t *req, const char *status, const char *message)
 {
     httpd_resp_set_status(req, status);
@@ -49,18 +56,21 @@ static esp_err_t json_error(httpd_req_t *req, const char *status, const char *me
     return httpd_resp_sendstr(req, body);
 }
 
+/** Send the standard JSON success response. */
 static esp_err_t json_ok(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+/** Serve the embedded dashboard. Returns the HTTP send result. */
 static esp_err_t index_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     return httpd_resp_send(req, web_index_start, web_index_end - web_index_start - 1);
 }
 
+/** Gather subsystem snapshots and return the uncached status JSON response. */
 static esp_err_t status_handler(httpd_req_t *req)
 {
     clock_status_t status = {0};
@@ -121,6 +131,9 @@ static esp_err_t status_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, body);
 }
 
+/** Validate display/sound settings and save with optimistic conflict detection.
+ * Optional newer fields retain their existing values when older clients omit them.
+ */
 static esp_err_t settings_handler(httpd_req_t *req)
 {
     clock_form_t form;
@@ -162,6 +175,7 @@ static esp_err_t settings_handler(httpd_req_t *req)
     return json_ok(req);
 }
 
+/** Validate and persist one alarm slot without overwriting concurrent updates. */
 static esp_err_t alarm_handler(httpd_req_t *req)
 {
     clock_form_t form;
@@ -190,12 +204,14 @@ static esp_err_t alarm_handler(httpd_req_t *req)
     return json_ok(req);
 }
 
+/** Request that the alarm task stop its active scheduled sound. */
 static esp_err_t stop_handler(httpd_req_t *req)
 {
     clock_alarm_stop();
     return json_ok(req);
 }
 
+/** Validate a stopwatch/reminder command and apply its state transition. */
 static esp_err_t timer_handler(httpd_req_t *req)
 {
     clock_form_t form;
@@ -231,6 +247,7 @@ static esp_err_t timer_handler(httpd_req_t *req)
     return json_ok(req);
 }
 
+/** Start an asynchronous Wi-Fi scan, returning conflict if one is active. */
 static esp_err_t scan_start_handler(httpd_req_t *req)
 {
     esp_err_t err = clock_network_scan_start();
@@ -242,6 +259,7 @@ static esp_err_t scan_start_handler(httpd_req_t *req)
     return json_ok(req);
 }
 
+/** Return scan progress or stream results with SSID bytes encoded as hex. */
 static esp_err_t scan_status_handler(httpd_req_t *req)
 {
     clock_scan_result_t result = clock_network_scan_result();
@@ -273,6 +291,7 @@ static esp_err_t scan_status_handler(httpd_req_t *req)
     return err;
 }
 
+/** Wait briefly for the HTTP response, then restart. @param arg Unused. */
 static void restart_task(void *arg)
 {
     (void)arg;
@@ -280,17 +299,20 @@ static void restart_task(void *arg)
     esp_restart();
 }
 
+/** Launch the delayed restart worker. @return False if task creation fails. */
 static bool schedule_restart(void)
 {
     return xTaskCreatePinnedToCore(restart_task, "restart", 2048, NULL, 5, NULL, 0) == pdPASS;
 }
 
+/** Schedule a reboot and send its acknowledgement. */
 static esp_err_t reboot_handler(httpd_req_t *req)
 {
     if (!schedule_restart()) return json_error(req, "500 Internal Server Error", "restart failed");
     return json_ok(req);
 }
 
+/** Save pending Wi-Fi credentials and schedule a reboot to try them. */
 static esp_err_t wifi_handler(httpd_req_t *req)
 {
     clock_form_t form;
@@ -311,12 +333,17 @@ static esp_err_t wifi_handler(httpd_req_t *req)
     return json_ok(req);
 }
 
+/** Resume scanning after an OTA failure; log if the scanner does not respond. */
 static void resume_display(void)
 {
     esp_err_t err = clock_display_pause(false);
     if (err != ESP_OK) ESP_LOGE(TAG, "Could not resume display: %s", esp_err_to_name(err));
 }
 
+/** Stream an OTA image into the inactive partition and select it for next boot.
+ * Requires station-only mode. On error abort the write when necessary and
+ * resume the paused display. Returns the HTTP response/send status.
+ */
 static esp_err_t ota_handler(httpd_req_t *req)
 {
     clock_network_status_t network = clock_network_status();
@@ -327,6 +354,8 @@ static esp_err_t ota_handler(httpd_req_t *req)
     if (!partition || req->content_len <= 0 || req->content_len > partition->size) {
         return json_error(req, "400 Bad Request", "invalid firmware size");
     }
+    /* Flash writes interfere with scan timing; blank and pause the panel until
+     * reboot or until an error requires normal operation to resume. */
     esp_err_t err = clock_display_pause(true);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Could not pause display: %s", esp_err_to_name(err));

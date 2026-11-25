@@ -8,6 +8,9 @@
 #include "clock_store.h"
 #include "clock_web.h"
 
+/** ESP-IDF entry point. Initialize services in dependency order, then mark a
+ * pending OTA image valid once startup has succeeded. Failures are fatal.
+ */
 void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());

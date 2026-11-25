@@ -5,6 +5,8 @@
 
 #include "clock_config.h"
 
+/* Bitmap tables hold original digit designs: string glyphs are 3x5, while
+ * integer rows encode pixels from the most significant used bit to the right. */
 static const char *const digits[5][10] = {
     {"111101101101111","010110010010111","111001111100111","111001111001111","101101111001001",
      "111100111001111","111100111101111","111001001001001","111101111101111","111101111001111"},
@@ -83,11 +85,13 @@ static const uint8_t rounded_digits[10][7] = {
     {0x0e, 0x11, 0x11, 0x0f, 0x01, 0x01, 0x0e},
 };
 
+/** Set a logical pixel if it lies within the 32x16 frame; clip otherwise. */
 static void pixel(clock_frame_t *frame, unsigned x, unsigned y)
 {
     if (x < 32 && y < 16) frame->rows[y][x / 8] |= 0x80U >> (x % 8);
 }
 
+/** Draw a 3x5 string bitmap at (x,y), expanding both axes by scale. */
 static void glyph(clock_frame_t *frame, const char *shape, unsigned x, unsigned y, unsigned scale)
 {
     for (unsigned row = 0; row < 5; ++row) {
@@ -102,6 +106,7 @@ static void glyph(clock_frame_t *frame, const char *shape, unsigned x, unsigned 
     }
 }
 
+/** Draw a selected bitmap digit, applying its vertical scaling and bolding. */
 static void sized_digit(clock_frame_t *frame, unsigned digit, unsigned x, unsigned font)
 {
     const uint8_t *rows = font == 5 || font == 10 || font == 11 ? large_digits[digit] :
@@ -124,16 +129,19 @@ static void sized_digit(clock_frame_t *frame, unsigned digit, unsigned x, unsign
     }
 }
 
+/** Return whether this font uses 2x2 separator dots rather than single pixels. */
 static bool square_separator(unsigned font)
 {
     return font != 7 && font != 9 && font != 14;
 }
 
+/** Return whether the font occupies space reserved for seconds animations. */
 static bool tall_font(unsigned font)
 {
     return font == 5 || font == 6 || font == 8 || font == 11 || font == 13;
 }
 
+/** Draw a six-pixel-wide seven-segment digit using a segment bitmask. */
 static void segment_digit(clock_frame_t *frame, unsigned digit, unsigned x)
 {
     static const uint8_t segments[10] = {0x3f, 0x06, 0x5b, 0x4f, 0x66,
@@ -152,6 +160,9 @@ static void segment_digit(clock_frame_t *frame, unsigned digit, unsigned x)
     }
 }
 
+/** Center the lit-pixel bounding box horizontally; return the applied x shift.
+ * The separator is shifted with the digits and its coordinate must be adjusted.
+ */
 static int center_clock(clock_frame_t *frame)
 {
     unsigned left = 32, right = 0;
@@ -188,6 +199,7 @@ int clock_render(clock_frame_t *frame, bool valid, unsigned hour, unsigned minut
         return -1;
     }
 
+    /* Preserve legacy IDs from saved settings, but render retired styles as 1. */
     if (font >= 2 && font <= 4) font = 0;
     if (format_12h) {
         hour %= 12;
@@ -235,6 +247,8 @@ void clock_render_seconds(clock_frame_t *frame, unsigned second, unsigned millis
         unsigned width = ((second + 1) * 32 + 59) / 60;
         for (unsigned x = 0; x < width; ++x) pixel(frame, x, 15);
     } else if (animation == CLOCK_SECONDS_BOUNCE || animation == CLOCK_SECONDS_JUMP) {
+        /* 100 ms steps move the bounce horizontally; the five-frame arc uses
+         * rows 12-15. Jump follows the minute and hops once each second. */
         unsigned step = (second * 10 + millisecond / 100);
         unsigned x = animation == CLOCK_SECONDS_BOUNCE ? step % 60 : second * 30 / 59;
         if (x > 30) x = 60 - x;
@@ -246,6 +260,7 @@ void clock_render_seconds(clock_frame_t *frame, unsigned second, unsigned millis
     }
 }
 
+/** Draw a supported 5x7 status character at (x,y); unsupported characters are blank. */
 static void small_character(clock_frame_t *frame, char c, unsigned x, unsigned y)
 {
     static const uint8_t w[] = {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0a};
@@ -286,6 +301,7 @@ static void small_character(clock_frame_t *frame, char c, unsigned x, unsigned y
     }
 }
 
+/** Draw up to five fixed-width status characters horizontally centered. */
 static void centered_text(clock_frame_t *frame, const char *text, unsigned y)
 {
     size_t count = strlen(text);
@@ -341,6 +357,8 @@ void clock_render_timer(clock_frame_t *frame, bool reminder, uint32_t first,
     centered_text(frame, reminder ? "RE" : "ST", 0);
     unsigned values[] = {first / 10, first % 10, second / 10, second % 10,
                          third / 10, third % 10};
+    /* Six 4x7 digits fit in a reminder; stopwatch uses five digits because
+     * only tenths (the tens digit of hundredths) are displayed. */
     static const unsigned reminder_x[] = {0, 5, 11, 16, 22, 27};
     static const unsigned stopwatch_x[] = {3, 8, 14, 19, 25};
     const unsigned *x = reminder ? reminder_x : stopwatch_x;

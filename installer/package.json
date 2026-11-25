@@ -1,0 +1,14 @@
+{
+  "name": "momentra-installer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild node_modules/esp-web-tools/dist/web/install-button.js --bundle --format=esm --outfile=dist/esp-web-tools.js"
+  },
+  "dependencies": {
+    "esp-web-tools": "10.5.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

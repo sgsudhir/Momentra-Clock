@@ -4,6 +4,7 @@
 
 void clock_config_defaults(clock_config_t *config)
 {
+    /* Clear the entire struct, including padding, for stable snapshot comparisons. */
     memset(config, 0, sizeof(*config));
     config->brightness = 50;
     config->feedback_enabled = 1;
@@ -14,6 +15,7 @@ void clock_config_defaults(clock_config_t *config)
 
 bool clock_alarm_duration_valid(unsigned seconds)
 {
+    /* Preserve legacy multiples of ten as well as newer dashboard choices. */
     return seconds == 5 || seconds == 15 || seconds == 45 || seconds == 240 ||
            seconds == 300 || (seconds >= 10 && seconds <= 180 && seconds % 10 == 0);
 }

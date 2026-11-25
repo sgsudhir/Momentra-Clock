@@ -7,16 +7,24 @@
 #include "freertos/semphr.h"
 #include "nvs.h"
 
+/* write_lock serializes NVS transactions and compare-and-save operations.
+ * state_lock protects only the in-memory copy, so readers do not wait for
+ * flash writes. Writers acquire write_lock before taking state_lock. */
 static SemaphoreHandle_t state_lock;
 static SemaphoreHandle_t write_lock;
 static clock_config_t current;
 
+/** Read an optional byte, retaining the caller's default if the key is absent.
+ * @return ESP_OK for a value or missing key; otherwise the NVS error.
+ */
 static esp_err_t read_optional_u8(nvs_handle_t handle, const char *key, uint8_t *value)
 {
     esp_err_t err = nvs_get_u8(handle, key, value);
     return err == ESP_ERR_NVS_NOT_FOUND ? ESP_OK : err;
 }
 
+/* This prefix is the exact historical config_v1 blob layout. New options use
+ * separate NVS keys so existing devices can retain their saved settings. */
 typedef struct {
     uint8_t brightness;
     uint8_t font;
@@ -81,6 +89,9 @@ void clock_store_get(clock_config_t *config)
     xSemaphoreGive(state_lock);
 }
 
+/** Persist a changed snapshot and publish it only after a successful commit.
+ * Caller holds write_lock. Identical settings do not cause a flash write.
+ */
 static esp_err_t commit_update(const clock_config_t *old, const clock_config_t *config)
 {
     if (memcmp(old, config, sizeof(*old)) == 0) {
@@ -109,6 +120,7 @@ static esp_err_t commit_update(const clock_config_t *old, const clock_config_t *
     return err;
 }
 
+/** Serialize a validated update; expected, when non-NULL, detects stale writers. */
 static esp_err_t store_update(const clock_config_t *expected, const clock_config_t *config)
 {
     if (!clock_config_valid(config)) {
@@ -153,6 +165,8 @@ esp_err_t clock_store_claim_alarms(const clock_config_t *expected, uint8_t candi
     clock_config_t updated = old;
     uint8_t matching = 0;
     unsigned duration = 0;
+    /* Recheck enabled/time against current settings before claiming. Persist
+     * disabled one-shot alarms before returning them to the buzzer task. */
     for (unsigned i = 0; i < CLOCK_ALARM_COUNT; ++i) {
         clock_alarm_t *alarm = &updated.alarms[i];
         if (!(candidates & (1U << i)) || !alarm->enabled ||

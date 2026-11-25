@@ -1,5 +1,6 @@
 #include "clock_schedule.h"
 
+/* Scheduling uses a fixed UTC+05:30 offset, independent of libc timezone state. */
 #define INDIA_OFFSET_SECONDS (5 * 3600 + 30 * 60)
 
 void clock_schedule_init(clock_schedule_t *schedule)
@@ -15,6 +16,8 @@ clock_events_t clock_schedule_check(clock_schedule_t *schedule, const clock_conf
         return events;
     }
 
+    /* Track an absolute local minute, not minute-of-day, so each minute is
+     * considered once even when the wall clock moves backwards. */
     int64_t minute = (unix_seconds + INDIA_OFFSET_SECONDS) / 60;
     if (minute <= schedule->last_minute) {
         return events;

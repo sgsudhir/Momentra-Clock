@@ -1,0 +1,90 @@
+name: Build and publish installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: installer/package-lock.json
+      - name: Run host checks
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -I main \
+            main/clock_config.c main/clock_schedule.c main/clock_freshness.c \
+            main/clock_render.c main/clock_scan.c main/clock_form.c main/clock_sound.c \
+            tests/test_clock_logic.c -o /tmp/clock-logic-test
+          /tmp/clock-logic-test
+          cc -std=c11 -Wall -Wextra -Werror -pthread -I tests/stubs -I main \
+            main/clock_config.c main/clock_store.c tests/test_clock_store.c -o /tmp/clock-store-test
+          /tmp/clock-store-test
+          cc -std=c11 -Wall -Wextra -Werror -I main \
+            main/clock_config.c main/clock_status.c tests/test_clock_status.c -o /tmp/clock-status-test
+          /tmp/clock-status-test | node tests/test_status_json.js
+          cc -std=c11 -Wall -Wextra -Werror -I main \
+            main/clock_timer_logic.c tests/test_clock_timers.c -o /tmp/clock-timers-test
+          /tmp/clock-timers-test
+          node tests/test_installer.mjs
+      - name: Build self-hosted web installer
+        run: |
+          npm ci --prefix installer --no-audit --no-fund
+          npm run build --prefix installer
+          mkdir -p build/site/firmware build/site/licenses
+          cp installer/index.html installer/style.css installer/app.js installer/manifest.json build/site/
+          cp installer/dist/esp-web-tools.js build/site/
+          cp installer/node_modules/esp-web-tools/LICENSE build/site/licenses/esp-web-tools.txt
+      - name: Build and merge ESP32 production firmware
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/project" -w /project espressif/idf:v6.1 bash -c '
+            set -eu
+            git config --global --add safe.directory /project
+            idf.py -B build/production -D SDKCONFIG=/project/build/production/sdkconfig build
+            esptool --chip esp32 merge-bin --flash-mode dio --flash-size 4MB --flash-freq 40m \
+              -o build/site/firmware/momentra-factory.bin \
+              0x1000 build/production/bootloader/bootloader.bin \
+              0x8000 build/production/partition_table/partition-table.bin \
+              0xf000 build/production/ota_data_initial.bin \
+              0x20000 build/production/ESP_P10_Clock_BLR.bin
+          '
+          jq -e '
+            .extra_esptool_args.chip == "esp32" and
+            .flash_settings.flash_mode == "dio" and
+            .flash_settings.flash_size == "4MB" and
+            .flash_settings.flash_freq == "40m" and
+            .flash_files == {
+              "0x1000": "bootloader/bootloader.bin",
+              "0x8000": "partition_table/partition-table.bin",
+              "0xf000": "ota_data_initial.bin",
+              "0x20000": "ESP_P10_Clock_BLR.bin"
+            }
+          ' build/production/flasher_args.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

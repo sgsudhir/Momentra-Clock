@@ -6,6 +6,8 @@
 bool clock_status_json(const clock_status_t *status, char *buffer, size_t capacity)
 {
     if (!status || !buffer || !capacity) return false;
+    /* Prepare JSON tokens for optional fields: unavailable values are null,
+     * rather than misleading zeroes. The fixed fields need no string escaping. */
     char rssi[16], age[24], timestamp[24], timestamp_ms[24];
     char ip[20];
     if (status->ip_valid) {
@@ -58,6 +60,8 @@ bool clock_status_json(const clock_status_t *status, char *buffer, size_t capaci
         config->hourly_enabled, config->hourly_pattern, config->feedback_enabled,
         config->colon_blink, config->seconds_animation);
     if (length < 0 || (size_t)length >= capacity) return false;
+    /* snprintf reports the required size even on truncation. Check every
+     * append before advancing the cursor, including space for the final NUL. */
     size_t used = length;
     for (unsigned i = 0; i < CLOCK_ALARM_COUNT; ++i) {
         const clock_alarm_t *item = &config->alarms[i];

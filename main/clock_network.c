@@ -17,13 +17,16 @@
 #include "mdns.h"
 #include "nvs.h"
 
-#define RETRY_LIMIT 5
+#define RETRY_LIMIT 5 /* Failed attempts before enabling the setup access point. */
 
+/* Credentials are copied between NVS and Wi-Fi with room for a trailing NUL. */
 typedef struct {
     char ssid[33];
     char password[65];
 } credentials_t;
 
+/* ESP-IDF event callbacks enqueue small messages; the network task performs
+ * potentially blocking Wi-Fi, NVS and SNTP operations outside the callback. */
 typedef enum {
     NETWORK_STARTED,
     NETWORK_DISCONNECTED,
@@ -36,17 +39,17 @@ typedef struct {
 } network_event_t;
 
 static const char *TAG = "clock_network";
-static QueueHandle_t events;
-static SemaphoreHandle_t credentials_lock;
+static QueueHandle_t events;                 /* Wi-Fi/IP events for network_task. */
+static SemaphoreHandle_t credentials_lock;   /* Serializes credential NVS access. */
 static portMUX_TYPE status_lock = portMUX_INITIALIZER_UNLOCKED;
-static bool connected;
-static bool ap_active;
-static clock_network_display_t display_status;
-static credentials_t credentials;
-static bool have_credentials;
-static bool pending_credentials;
+static bool connected;                       /* Station has an IP. */
+static bool ap_active;                       /* Setup access point is running. */
+static clock_network_display_t display_status; /* Connection screen snapshot. */
+static credentials_t credentials;            /* Credentials selected at boot. */
+static bool have_credentials;                /* A valid saved/pending value exists. */
+static bool pending_credentials;             /* Candidate not yet confirmed by connection. */
 static portMUX_TYPE scan_lock = portMUX_INITIALIZER_UNLOCKED;
-static clock_scan_result_t scan_result;
+static clock_scan_result_t scan_result;       /* Last asynchronous scan and state. */
 
 clock_scan_result_t clock_network_scan_result(void)
 {
@@ -56,6 +59,9 @@ clock_scan_result_t clock_network_scan_result(void)
     return result;
 }
 
+/** Perform a blocking scan on a separate task, publish deduplicated SSIDs.
+ * @param arg Unused. Failure details are retained in scan_result and logged.
+ */
 static void scan_task(void *arg)
 {
     (void)arg;
@@ -114,6 +120,7 @@ esp_err_t clock_network_scan_start(void)
     return ESP_OK;
 }
 
+/** Check SSID and password lengths, including their terminating NULs. */
 static bool credentials_valid(const credentials_t *value)
 {
     size_t ssid_length = strnlen(value->ssid, sizeof(value->ssid));
@@ -122,6 +129,9 @@ static bool credentials_valid(const credentials_t *value)
            (password_length == 0 || (password_length >= 8 && password_length <= 63));
 }
 
+/** Load pending credentials first, otherwise the last successful credentials.
+ * @return ESP_OK if loaded or absent; NVS/validation error otherwise.
+ */
 static esp_err_t load_credentials(void)
 {
     nvs_handle_t handle;
@@ -180,6 +190,10 @@ esp_err_t clock_network_store_credentials(const char *ssid, const char *password
     return err;
 }
 
+/** Promote connected credentials to saved; erase only the same pending value.
+ * A newer pending value may have arrived through the HTTP task meanwhile.
+ * @return NVS status.
+ */
 static esp_err_t save_successful_credentials(void)
 {
     xSemaphoreTake(credentials_lock, portMAX_DELAY);
@@ -209,6 +223,7 @@ static esp_err_t save_successful_credentials(void)
     return err;
 }
 
+/** Publish station and access-point state together for concurrent readers. */
 static void set_status(bool station, bool access_point)
 {
     portENTER_CRITICAL(&status_lock);
@@ -239,6 +254,11 @@ clock_network_status_t clock_network_status(void)
     return result;
 }
 
+/** Translate relevant ESP-IDF events into nonblocking network-task messages.
+ * @param arg Unused registration argument.
+ * @param base Event category; @param id Event identifier.
+ * @param data Event-specific data, including the IPv4 address on GOT_IP.
+ */
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     (void)arg;
@@ -260,10 +280,11 @@ static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     }
 }
 
+/** Enable the open setup AP alongside station mode. @return Wi-Fi setup status. */
 static esp_err_t enable_ap(void)
 {
     wifi_config_t config = {
-        .ap = {.ssid = "P10-Clock-Setup", .ssid_len = 15, .channel = 1,
+        .ap = {.ssid = "Momentra Clock", .ssid_len = sizeof("Momentra Clock") - 1, .channel = 1,
                .max_connection = 4, .authmode = WIFI_AUTH_OPEN},
     };
     esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
@@ -272,11 +293,14 @@ static esp_err_t enable_ap(void)
     }
     if (err == ESP_OK) {
         set_status(false, true);
-        ESP_LOGW(TAG, "Open setup AP enabled: P10-Clock-Setup");
+        ESP_LOGW(TAG, "Open setup AP enabled: Momentra Clock");
     }
     return err;
 }
 
+/** Manage station retries, setup AP fallback, connection display and SNTP.
+ * @param arg Unused. Runs until restart, consuming events and retrying on timeout.
+ */
 static void network_task(void *arg)
 {
     (void)arg;
@@ -317,6 +341,8 @@ static void network_task(void *arg)
             if (rssi_err != ESP_OK) {
                 ESP_LOGW(TAG, "Wi-Fi signal unavailable: %s", esp_err_to_name(rssi_err));
             }
+            /* Reset the display sequence only on a disconnected-to-connected
+             * transition, not on repeated GOT_IP events for the same session. */
             int64_t now = esp_timer_get_time();
             portENTER_CRITICAL(&status_lock);
             if (!connected) display_status.connected_at_us = now;
