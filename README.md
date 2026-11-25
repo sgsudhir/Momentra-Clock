@@ -109,17 +109,33 @@ firmware. OTA is rejected unless connected in station-only mode. Use only on a
 trusted, isolated network; this is not suitable for an untrusted LAN or public
 Internet.
 
-The clock uses `pool.ntp.org` and Asia/Kolkata (UTC+05:30). After boot it
-displays `SYNC...` until the first successful NTP update. It requests a new
+The clock uses `pool.ntp.org` and Asia/Kolkata (UTC+05:30). While connecting,
+the panel displays `WiFi`. On each connection it shows RSSI for two seconds
+and the last IP octet for two seconds, then the time or a two-line `SYNC` and
+five dots until NTP succeeds. The connecting screen remains visible in setup AP
+mode until a station connection succeeds. Running timers take display priority,
+so they can temporarily hide the connection screens. It requests a new
 NTP synchronization every minute after successful responses; network failures
 can delay retries. Once 12 hours have elapsed without a successful sync,
-the clock returns to `SYNC...` and suppresses scheduled alarms and chimes.
+the clock shows `SYNC` when connected and suppresses scheduled alarms and chimes.
 Brief Wi-Fi outages do not immediately invalidate time.
 
 ## Controls and alarms
 
-The web page configures brightness (0-100%), five font styles, 12/24-hour
-display, hourly chime enable and four active-buzzer beep patterns. Five alarm
+The web page configures brightness (0-100%), twelve selectable font styles, 12/24-hour
+display, hourly chime enable and four active-buzzer beep patterns. The three
+original sized styles include 14-pixel large, 12-pixel medium and 5x7 small;
+additional styles include tall, extra small, wide, two bold variants, digital
+segments and rounded compact. Removed styles 3-5 retain their saved IDs for API
+compatibility but render as Style 1; the page selects Style 1 when they are saved.
+The panel does not show AM/PM, including in 12-hour mode. Stopwatch and reminder
+displays use a separate compact 4x7 font. Before downgrading to older firmware,
+select Style 1 or 2: older versions reject font values they do not recognize.
+Optional colon blinking and moving-dot, minute-progress, bouncing-ball and
+jumping-ball animations use synchronized time. Animations occupy the bottom
+four rows, are disabled for taller fonts, and are hidden while displaying timers
+or connection screens.
+Both effects default to off and are saved across restarts. Five alarm
 slots support once or daily repetition; selectable durations are 5, 10, 15, 20,
 30, 45, 60, 90, 120, 150, 180, 240 and 300 seconds. Older saved durations
 remain supported. One-shot alarms are persisted as
@@ -185,11 +201,13 @@ return 500 with an `error` field. Successful writes return `{"ok":true}`.
   `display_ready`, `buzzer_configured`, `ringing`, `ringing_mask`,
   `stopwatch_state`, `stopwatch_ms`, `reminder_state`, `reminder_ms`,
   `brightness`, `font`, `format_12h`, `hourly_enabled`, `hourly_pattern`,
-  `feedback_enabled`, and
+  `feedback_enabled`, `colon_blink`, `seconds_animation`, and
   an `alarms` array. Wi-Fi credentials are never returned.
-- `POST /api/settings`: `brightness` 0-100, `font` 0-4, `format_12h` 0/1,
+- `POST /api/settings`: `brightness` 0-100, `font` 0-14, `format_12h` 0/1,
   `hourly_enabled` 0/1, `hourly_pattern` 0-3, and optional `feedback_enabled`
-  0/1. Omitting `feedback_enabled` preserves its current value for older clients.
+  0/1, optional `colon_blink` 0/1, and optional `seconds_animation` 0 (off),
+  1 (dot), 2 (progress), 3 (bounce) or 4 (jump). Omitted optional fields retain
+  their current values.
 - `POST /api/alarm`: `index` 0-4, `enabled` 0/1, `hour` 0-23, `minute` 0-59,
   `repeat` 0 (once) or 1 (daily), and `duration_seconds`.
 - `POST /api/alarm/stop`: stop the current alarm sound.

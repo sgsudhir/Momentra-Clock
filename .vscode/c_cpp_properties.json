@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "ESP-IDF",
+            "compilerPath": "",
+            "compileCommands": "/home/sudhir/Projects/ESP_P10_Clock_BLR/build/default/compile_commands.json",
+            "intelliSenseMode": "gcc-x86",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}

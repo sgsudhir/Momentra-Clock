@@ -4,8 +4,17 @@
 #include <stdint.h>
 
 #define CLOCK_ALARM_COUNT 5
-#define CLOCK_FONT_COUNT 5
+#define CLOCK_FONT_COUNT 15
 #define CLOCK_SOUND_COUNT 4
+
+typedef enum {
+    CLOCK_SECONDS_NONE = 0,
+    CLOCK_SECONDS_DOT,
+    CLOCK_SECONDS_PROGRESS,
+    CLOCK_SECONDS_BOUNCE,
+    CLOCK_SECONDS_JUMP,
+    CLOCK_SECONDS_ANIMATION_COUNT,
+} clock_seconds_animation_t;
 
 typedef enum {
     ALARM_ONCE = 0,
@@ -28,6 +37,8 @@ typedef struct {
     uint8_t hourly_pattern;
     clock_alarm_t alarms[CLOCK_ALARM_COUNT];
     uint8_t feedback_enabled;
+    uint8_t colon_blink;
+    uint8_t seconds_animation;
 } clock_config_t;
 
 void clock_config_defaults(clock_config_t *config);

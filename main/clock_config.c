@@ -22,7 +22,8 @@ bool clock_config_valid(const clock_config_t *config)
 {
     if (!config || config->brightness > 100 || config->font >= CLOCK_FONT_COUNT ||
         config->format_12h > 1 || config->hourly_enabled > 1 ||
-        config->hourly_pattern >= CLOCK_SOUND_COUNT || config->feedback_enabled > 1) {
+        config->hourly_pattern >= CLOCK_SOUND_COUNT || config->feedback_enabled > 1 ||
+        config->colon_blink > 1 || config->seconds_animation >= CLOCK_SECONDS_ANIMATION_COUNT) {
         return false;
     }
     for (unsigned i = 0; i < CLOCK_ALARM_COUNT; ++i) {

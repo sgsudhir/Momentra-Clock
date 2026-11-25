@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "clock_render.h"
+#include "clock_network.h"
 #include "clock_scan.h"
 #include "clock_store.h"
 #include "clock_time.h"
@@ -13,6 +14,7 @@
 #include "driver/spi_master.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -131,11 +133,25 @@ static void render_task(void *arg)
             clock_render_timer(&frame, true, seconds / 3600, seconds / 60 % 60,
                                seconds % 60, config.font);
         } else {
-            clock_time_snapshot_t time_state = clock_time_snapshot();
-            struct tm local = {0};
-            if (time_state.valid) localtime_r(&time_state.unix_time, &local);
-            clock_render(&frame, time_state.valid, local.tm_hour, local.tm_min,
-                         config.format_12h, config.font);
+            clock_network_display_t network = clock_network_display_status();
+            clock_connection_phase_t phase = clock_connection_phase(network.connected,
+                                                                     network.connected_at_us,
+                                                                     esp_timer_get_time());
+            if (phase != CLOCK_CONNECTION_DONE) {
+                clock_render_connection(&frame, phase, network.rssi_valid, network.rssi,
+                                        network.ip_last_octet);
+            } else {
+                clock_time_snapshot_t time_state = clock_time_snapshot();
+                struct tm local = {0};
+                if (time_state.valid) localtime_r(&time_state.unix_time, &local);
+                int separator_x = clock_render(&frame, time_state.valid, local.tm_hour, local.tm_min,
+                                               config.format_12h, config.font);
+                if (time_state.valid) {
+                    clock_render_seconds(&frame, local.tm_sec, time_state.unix_time_ms % 1000,
+                                         config.colon_blink, config.seconds_animation,
+                                         config.font, separator_x);
+                }
+            }
         }
         portENTER_CRITICAL(&frame_lock);
         rendered_frame = frame;

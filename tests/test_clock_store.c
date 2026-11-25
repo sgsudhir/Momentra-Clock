@@ -10,8 +10,15 @@ static clock_config_t saved;
 static bool exists;
 static bool fail_commit;
 static unsigned writes;
-static bool feedback_exists;
-static uint8_t saved_feedback;
+static struct {
+    const char *key;
+    bool exists;
+    uint8_t value;
+} saved_options[] = {
+    {"feedback", false, 0},
+    {"colon_blink", false, 0},
+    {"seconds_anim", false, 0},
+};
 
 esp_err_t nvs_open(const char *name, int mode, nvs_handle_t *handle)
 {
@@ -47,19 +54,29 @@ esp_err_t nvs_set_blob(nvs_handle_t handle, const char *key, const void *value, 
 esp_err_t nvs_get_u8(nvs_handle_t handle, const char *key, uint8_t *value)
 {
     (void)handle;
-    assert(strcmp(key, "feedback") == 0);
-    if (!feedback_exists) return ESP_ERR_NVS_NOT_FOUND;
-    *value = saved_feedback;
-    return ESP_OK;
+    for (unsigned i = 0; i < sizeof(saved_options) / sizeof(saved_options[0]); ++i) {
+        if (strcmp(key, saved_options[i].key) == 0) {
+            if (!saved_options[i].exists) return ESP_ERR_NVS_NOT_FOUND;
+            *value = saved_options[i].value;
+            return ESP_OK;
+        }
+    }
+    assert(false);
+    return ESP_FAIL;
 }
 
 esp_err_t nvs_set_u8(nvs_handle_t handle, const char *key, uint8_t value)
 {
     (void)handle;
-    assert(strcmp(key, "feedback") == 0);
-    saved_feedback = value;
-    feedback_exists = true;
-    return ESP_OK;
+    for (unsigned i = 0; i < sizeof(saved_options) / sizeof(saved_options[0]); ++i) {
+        if (strcmp(key, saved_options[i].key) == 0) {
+            saved_options[i].value = value;
+            saved_options[i].exists = true;
+            return ESP_OK;
+        }
+    }
+    assert(false);
+    return ESP_FAIL;
 }
 
 esp_err_t nvs_commit(nvs_handle_t handle)
@@ -79,7 +96,8 @@ int main(void)
     assert(clock_store_init() == ESP_OK);
     clock_config_t config;
     clock_store_get(&config);
-    assert(config.brightness == 50 && config.feedback_enabled == 1);
+    assert(config.brightness == 50 && config.feedback_enabled == 1 &&
+           config.colon_blink == 0 && config.seconds_animation == CLOCK_SECONDS_NONE);
     config.alarms[0] = (clock_alarm_t){1, 7, 30, ALARM_ONCE, 10};
     config.alarms[1] = (clock_alarm_t){1, 7, 30, ALARM_DAILY, 30};
     assert(clock_store_set(&config) == ESP_OK);
@@ -111,17 +129,49 @@ int main(void)
     assert(clock_store_claim_alarms(&config, 1, &claimed, &duration) == ESP_OK);
     assert(claimed == 0 && duration == 0);
     after.feedback_enabled = 0;
+    after.colon_blink = 1;
+    after.seconds_animation = CLOCK_SECONDS_PROGRESS;
     assert(clock_store_set(&after) == ESP_OK);
     assert(clock_store_init() == ESP_OK);
     clock_store_get(&config);
-    assert(config.feedback_enabled == 0 && config.brightness == 75 &&
+    assert(config.feedback_enabled == 0 && config.colon_blink == 1 &&
+           config.seconds_animation == CLOCK_SECONDS_PROGRESS && config.brightness == 75 &&
            config.alarms[0].hour == 8);
-    feedback_exists = false;
+    for (unsigned effect = CLOCK_SECONDS_BOUNCE; effect <= CLOCK_SECONDS_JUMP; ++effect) {
+        config.font = effect == CLOCK_SECONDS_BOUNCE ? 13 : 14;
+        config.seconds_animation = effect;
+        assert(clock_store_set(&config) == ESP_OK);
+        assert(clock_store_init() == ESP_OK);
+        clock_store_get(&config);
+        assert(config.seconds_animation == effect && config.font ==
+               (effect == CLOCK_SECONDS_BOUNCE ? 13 : 14));
+    }
+    config.font = 3;
+    assert(clock_store_set(&config) == ESP_OK);
     assert(clock_store_init() == ESP_OK);
     clock_store_get(&config);
-    assert(config.feedback_enabled == 1 && config.brightness == 75 &&
+    assert(config.font == 3);
+    saved_options[1].exists = false;
+    saved_options[2].exists = false;
+    assert(clock_store_init() == ESP_OK);
+    clock_store_get(&config);
+    assert(config.feedback_enabled == 0 && config.colon_blink == 0 &&
+           config.seconds_animation == CLOCK_SECONDS_NONE && config.brightness == 75);
+    for (unsigned i = 0; i < sizeof(saved_options) / sizeof(saved_options[0]); ++i) {
+        saved_options[i].exists = false;
+    }
+    assert(clock_store_init() == ESP_OK);
+    clock_store_get(&config);
+    assert(config.feedback_enabled == 1 && config.colon_blink == 0 &&
+           config.seconds_animation == CLOCK_SECONDS_NONE && config.brightness == 75 &&
            config.alarms[0].hour == 8);
     config.feedback_enabled = 2;
+    assert(clock_store_set(&config) == ESP_ERR_INVALID_ARG);
+    config.feedback_enabled = 1;
+    config.colon_blink = 2;
+    assert(clock_store_set(&config) == ESP_ERR_INVALID_ARG);
+    config.colon_blink = 0;
+    config.seconds_animation = CLOCK_SECONDS_ANIMATION_COUNT;
     assert(clock_store_set(&config) == ESP_ERR_INVALID_ARG);
     puts("clock store tests passed");
     return 0;

@@ -12,9 +12,18 @@ typedef struct {
     int rssi;
 } clock_network_status_t;
 
+typedef struct {
+    bool connected;
+    bool rssi_valid;
+    int rssi;
+    uint8_t ip_last_octet;
+    int64_t connected_at_us;
+} clock_network_display_t;
+
 esp_err_t clock_network_start(void);
 esp_err_t clock_network_store_credentials(const char *ssid, const char *password);
 clock_network_status_t clock_network_status(void);
+clock_network_display_t clock_network_display_status(void);
 
 #define CLOCK_SCAN_MAX_NETWORKS 20
 typedef struct {

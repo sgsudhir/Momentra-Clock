@@ -6,6 +6,12 @@
         "target/esp32.cfg"
     ],
     "idf.customExtraVars": {},
+    "cmake.environment": {
+        "IDF_PATH": "/home/sudhir/.espressif/v6.1/esp-idf",
+        "IDF_TOOLS_PATH": "/home/sudhir/.espressif",
+        "IDF_PYTHON_ENV_PATH": "/home/sudhir/.espressif/python_env/idf6.1_py3.12_env",
+        "PATH": "/home/sudhir/.espressif/python_env/idf6.1_py3.12_env/bin:/home/sudhir/.espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/bin:${env:PATH}"
+    },
     "clangd.path": "/home/sudhir/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd",
     "clangd.arguments": [
       "--background-index",

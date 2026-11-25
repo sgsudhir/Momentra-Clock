@@ -207,10 +207,16 @@ html[data-theme=sand] .timer-value{color:#8b5a24}
           <input name="brightness" type="range" min="0" max="100" required>
         </label>
         <label class="field">Font style
-          <select name="font"><option value="0">Style 1</option><option value="1">Style 2</option><option value="2">Style 3</option><option value="3">Style 4</option><option value="4">Style 5</option></select>
+          <select name="font"><option value="0">Style 1</option><option value="1">Style 2</option><option value="5">Large outdoor (14 px)</option><option value="6">Medium (12 px)</option><option value="7">Small indoor (5×7)</option><option value="8">Tall slim</option><option value="9">Extra small</option><option value="10">Wide</option><option value="11">Bold tall</option><option value="12">Bold compact</option><option value="13">Digital segments</option><option value="14">Rounded compact</option></select>
         </label>
         <label class="field">Time format
           <select name="format_12h"><option value="0">24 hour</option><option value="1">12 hour</option></select>
+        </label>
+        <label class="field">Blink colon
+          <select name="colon_blink"><option value="0">Off</option><option value="1">On</option></select>
+        </label>
+        <label class="field">Seconds animation
+          <select name="seconds_animation"><option value="0">Off</option><option value="1">Moving dot</option><option value="2">Progress bar</option><option value="3">Bouncing ball</option><option value="4">Jumping ball</option></select>
         </label>
         <label class="field">Hourly chime
           <select name="hourly_enabled"><option value="0">Off</option><option value="1">On</option></select>
@@ -223,7 +229,7 @@ html[data-theme=sand] .timer-value{color:#8b5a24}
           <button id="feedback-toggle" type="button" class="secondary" aria-pressed="false">Feedback: Off</button>
         </div>
       </div>
-      <p class="hint">Save settings to apply. Alarms, reminders and hourly chimes are unaffected.</p>
+      <p class="hint">The panel does not show AM/PM. Seconds animations require a shorter font. Save settings to apply.</p>
       <button class="primary action">Save settings</button>
       </fieldset>
     </form>
@@ -515,7 +521,7 @@ async function refresh() {
     }
     renderStatus();
     if (!populated) {
-      fill($('settings'), data);
+      fill($('settings'), {...data, font: data.font >= 2 && data.font <= 4 ? 0 : data.font});
       brightnessLabel();
       renderFeedback();
       fillAlarm();

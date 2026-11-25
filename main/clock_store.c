@@ -11,6 +11,12 @@ static SemaphoreHandle_t state_lock;
 static SemaphoreHandle_t write_lock;
 static clock_config_t current;
 
+static esp_err_t read_optional_u8(nvs_handle_t handle, const char *key, uint8_t *value)
+{
+    esp_err_t err = nvs_get_u8(handle, key, value);
+    return err == ESP_ERR_NVS_NOT_FOUND ? ESP_OK : err;
+}
+
 typedef struct {
     uint8_t brightness;
     uint8_t font;
@@ -57,9 +63,10 @@ esp_err_t clock_store_init(void)
         err = ESP_ERR_INVALID_STATE;
     }
     if (err == ESP_OK) {
-        err = nvs_get_u8(handle, "feedback", &current.feedback_enabled);
-        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+        err = read_optional_u8(handle, "feedback", &current.feedback_enabled);
     }
+    if (err == ESP_OK) err = read_optional_u8(handle, "colon_blink", &current.colon_blink);
+    if (err == ESP_OK) err = read_optional_u8(handle, "seconds_anim", &current.seconds_animation);
     nvs_close(handle);
     if (err != ESP_OK) {
         return err;
@@ -87,6 +94,8 @@ static esp_err_t commit_update(const clock_config_t *old, const clock_config_t *
         if (err == ESP_OK) {
             err = nvs_set_u8(handle, "feedback", config->feedback_enabled);
         }
+        if (err == ESP_OK) err = nvs_set_u8(handle, "colon_blink", config->colon_blink);
+        if (err == ESP_OK) err = nvs_set_u8(handle, "seconds_anim", config->seconds_animation);
         if (err == ESP_OK) {
             err = nvs_commit(handle);
         }

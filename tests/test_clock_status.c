@@ -35,6 +35,8 @@ int main(void)
     status.reminder_state = TIMER_PAUSED;
     status.reminder_ms = 5000;
     status.config.feedback_enabled = 0;
+    status.config.colon_blink = 1;
+    status.config.seconds_animation = CLOCK_SECONDS_PROGRESS;
     status.config.alarms[2] = (clock_alarm_t){1, 7, 30, ALARM_DAILY, 180};
     assert(clock_status_json(&status, output, sizeof(output)));
     puts(output);

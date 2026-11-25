@@ -124,14 +124,21 @@ static esp_err_t status_handler(httpd_req_t *req)
 static esp_err_t settings_handler(httpd_req_t *req)
 {
     clock_form_t form;
-    int brightness, font, format, hourly, pattern, feedback = 0;
-    if (!read_form(req, &form) || (form.count != 5 && form.count != 6) ||
+    int brightness, font, format, hourly, pattern, feedback = 0, blink = 0, animation = 0;
+    if (!read_form(req, &form)) return json_error(req, "400 Bad Request", "invalid settings");
+    bool has_feedback = clock_form_value(&form, "feedback_enabled") != NULL;
+    bool has_blink = clock_form_value(&form, "colon_blink") != NULL;
+    bool has_animation = clock_form_value(&form, "seconds_animation") != NULL;
+    if (form.count != 5U + has_feedback + has_blink + has_animation ||
         !clock_form_int(&form, "brightness", 0, 100, &brightness) ||
         !clock_form_int(&form, "font", 0, CLOCK_FONT_COUNT - 1, &font) ||
         !clock_form_int(&form, "format_12h", 0, 1, &format) ||
         !clock_form_int(&form, "hourly_enabled", 0, 1, &hourly) ||
         !clock_form_int(&form, "hourly_pattern", 0, CLOCK_SOUND_COUNT - 1, &pattern) ||
-        (form.count == 6 && !clock_form_int(&form, "feedback_enabled", 0, 1, &feedback))) {
+        (has_feedback && !clock_form_int(&form, "feedback_enabled", 0, 1, &feedback)) ||
+        (has_blink && !clock_form_int(&form, "colon_blink", 0, 1, &blink)) ||
+        (has_animation && !clock_form_int(&form, "seconds_animation", 0,
+                                          CLOCK_SECONDS_ANIMATION_COUNT - 1, &animation))) {
         return json_error(req, "400 Bad Request", "invalid settings");
     }
     clock_config_t old;
@@ -142,7 +149,9 @@ static esp_err_t settings_handler(httpd_req_t *req)
     updated.format_12h = format;
     updated.hourly_enabled = hourly;
     updated.hourly_pattern = pattern;
-    if (form.count == 6) updated.feedback_enabled = feedback;
+    if (has_feedback) updated.feedback_enabled = feedback;
+    if (has_blink) updated.colon_blink = blink;
+    if (has_animation) updated.seconds_animation = animation;
     esp_err_t err = clock_store_set_if_unchanged(&old, &updated);
     if (err == ESP_ERR_INVALID_STATE) return json_error(req, "409 Conflict", "settings changed; retry");
     if (err != ESP_OK) {

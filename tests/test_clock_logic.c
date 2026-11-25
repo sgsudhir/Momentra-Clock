@@ -70,13 +70,17 @@ int main(void)
     for (unsigned i = 0; i < CLOCK_FONT_COUNT; ++i) {
         clock_render(&fonts[i], true, 12, 45, false, i);
         for (unsigned j = 0; j < i; ++j) {
+            if ((i >= 2 && i <= 4) || (j >= 2 && j <= 4)) continue;
             assert(memcmp(&fonts[i], &fonts[j], sizeof(fonts[i])) != 0);
         }
     }
+    for (unsigned i = 2; i <= 4; ++i) assert(memcmp(&fonts[i], &fonts[0], sizeof(fonts[0])) == 0);
     clock_frame_t am, pm, unsynced, invalid;
-    clock_render(&am, true, 0, 30, true, 0);
-    clock_render(&pm, true, 12, 30, true, 0);
-    assert(memcmp(&am, &pm, sizeof(am)) != 0);
+    for (unsigned font = 0; font < CLOCK_FONT_COUNT; ++font) {
+        clock_render(&am, true, 0, 30, true, font);
+        clock_render(&pm, true, 12, 30, true, font);
+        assert(memcmp(&am, &pm, sizeof(am)) == 0);
+    }
     clock_render(&unsynced, false, 0, 0, false, 0);
     clock_render(&invalid, true, 24, 0, false, 0);
     assert(memcmp(&unsynced, &invalid, sizeof(invalid)) == 0);
@@ -91,13 +95,119 @@ int main(void)
     clock_render_timer(&invalid, false, 100, 0, 0, 0);
     clock_frame_t blank = {0};
     assert(memcmp(&invalid, &blank, sizeof(blank)) == 0);
+    for (unsigned font = 5; font < CLOCK_FONT_COUNT; ++font) {
+        clock_render_timer(&invalid, false, 12, 34, 56, font);
+        assert(memcmp(&stopwatch, &invalid, sizeof(stopwatch)) == 0);
+        config.font = font;
+        assert(clock_config_valid(&config));
+    }
+    config.font = CLOCK_FONT_COUNT;
+    assert(!clock_config_valid(&config));
+    config.font = 0;
     for (unsigned font = 0; font < CLOCK_FONT_COUNT; ++font) {
         for (unsigned hour = 0; hour < 24; ++hour) {
             for (unsigned minute = 0; minute < 60; ++minute) {
                 clock_render(&invalid, true, hour, minute, false, font);
+                assert(invalid.rows[15][0] == 0 && invalid.rows[15][1] == 0 &&
+                       invalid.rows[15][2] == 0 && invalid.rows[15][3] == 0);
+                unsigned left = 32, right = 0;
+                for (unsigned y = 0; y < 15; ++y) {
+                    for (unsigned x = 0; x < 32; ++x) {
+                        if (invalid.rows[y][x / 8] & (0x80U >> (x % 8))) {
+                            if (x < left) left = x;
+                            if (x > right) right = x;
+                        }
+                    }
+                }
+                assert(left < 32);
+                int difference = (int)left - (int)(31 - right);
+                assert(difference >= -1 && difference <= 1);
             }
         }
     }
+    clock_frame_t steady, animated;
+    int separator = clock_render(&steady, true, 12, 45, false, 5);
+    animated = steady;
+    clock_render_seconds(&animated, 0, 0, true, CLOCK_SECONDS_NONE, 5, separator);
+    assert(memcmp(&steady, &animated, sizeof(steady)) == 0);
+    clock_render_seconds(&animated, 1, 0, true, CLOCK_SECONDS_NONE, 5, separator);
+    for (unsigned row = 0; row < 16; ++row) {
+        for (unsigned x = 0; x < 32; ++x) {
+            bool difference = ((steady.rows[row][x / 8] ^ animated.rows[row][x / 8]) &
+                               (0x80U >> (x % 8))) != 0;
+            bool expected = (row == 5 || row == 6 || row == 9 || row == 10) &&
+                            (x == (unsigned)separator || x == (unsigned)separator + 1);
+            assert(difference == expected);
+        }
+    }
+    animated = steady;
+    clock_render_seconds(&animated, 0, 0, false, CLOCK_SECONDS_DOT, 5, separator);
+    assert(memcmp(&steady, &animated, sizeof(steady)) == 0);
+    const unsigned tall_fonts[] = {5, 6, 8, 11, 13};
+    for (unsigned i = 0; i < sizeof(tall_fonts) / sizeof(tall_fonts[0]); ++i) {
+        separator = clock_render(&steady, true, 12, 45, false, tall_fonts[i]);
+        for (unsigned effect = CLOCK_SECONDS_DOT; effect < CLOCK_SECONDS_ANIMATION_COUNT; ++effect) {
+            animated = steady;
+            clock_render_seconds(&animated, 17, 400, false, effect, tall_fonts[i], separator);
+            assert(memcmp(&steady, &animated, sizeof(steady)) == 0);
+        }
+    }
+    separator = clock_render(&steady, true, 12, 45, false, 7);
+    animated = steady;
+    clock_render_seconds(&animated, 1, 0, true, CLOCK_SECONDS_NONE, 7, separator);
+    for (unsigned row = 0; row < 16; ++row) {
+        for (unsigned x = 0; x < 32; ++x) {
+            bool difference = ((steady.rows[row][x / 8] ^ animated.rows[row][x / 8]) &
+                               (0x80U >> (x % 8))) != 0;
+            assert(difference == ((row == 5 || row == 9) && x == (unsigned)separator));
+        }
+    }
+    animated = steady;
+    clock_render_seconds(&animated, 0, 0, false, CLOCK_SECONDS_DOT, 7, separator);
+    assert(animated.rows[15][0] == 0x80 && animated.rows[15][3] == 0);
+    animated = steady;
+    clock_render_seconds(&animated, 59, 0, false, CLOCK_SECONDS_DOT, 7, separator);
+    assert(animated.rows[15][0] == 0 && animated.rows[15][3] == 0x01);
+    animated = steady;
+    clock_render_seconds(&animated, 0, 0, false, CLOCK_SECONDS_PROGRESS, 7, separator);
+    assert(animated.rows[15][0] == 0x80 && animated.rows[15][3] == 0);
+    animated = steady;
+    clock_render_seconds(&animated, 29, 0, false, CLOCK_SECONDS_PROGRESS, 7, separator);
+    assert(animated.rows[15][0] == 0xff && animated.rows[15][1] == 0xff &&
+           animated.rows[15][2] == 0 && animated.rows[15][3] == 0);
+    animated = steady;
+    clock_render_seconds(&animated, 59, 0, false, CLOCK_SECONDS_PROGRESS, 7, separator);
+    for (unsigned col = 0; col < 4; ++col) assert(animated.rows[15][col] == 0xff);
+    animated = steady;
+    clock_render_seconds(&animated, 60, 0, true, CLOCK_SECONDS_PROGRESS, 7, separator);
+    assert(memcmp(&animated, &steady, sizeof(steady)) == 0);
+    for (unsigned effect = CLOCK_SECONDS_BOUNCE; effect <= CLOCK_SECONDS_JUMP; ++effect) {
+        animated = steady;
+        clock_render_seconds(&animated, 1, 400, false, effect, 7, separator);
+        assert(memcmp(&animated, &steady, sizeof(steady)) != 0);
+        for (unsigned row = 0; row < 12; ++row) {
+            assert(memcmp(animated.rows[row], steady.rows[row], 4) == 0);
+        }
+    }
+    assert(clock_connection_phase(false, 0, 0) == CLOCK_CONNECTING);
+    assert(clock_connection_phase(true, 1000000, 2999999) == CLOCK_CONNECTION_RSSI);
+    assert(clock_connection_phase(true, 1000000, 3000000) == CLOCK_CONNECTION_IP);
+    assert(clock_connection_phase(true, 1000000, 4999999) == CLOCK_CONNECTION_IP);
+    assert(clock_connection_phase(true, 1000000, 5000000) == CLOCK_CONNECTION_DONE);
+    assert(clock_connection_phase(false, 1000000, 6000000) == CLOCK_CONNECTING);
+    assert(clock_connection_phase(true, 6000000, 6000000) == CLOCK_CONNECTION_RSSI);
+    clock_render_connection(&animated, CLOCK_CONNECTING, false, 0, 0);
+    assert(memcmp(&animated, &blank, sizeof(blank)) != 0);
+    clock_render_connection(&animated, CLOCK_CONNECTION_RSSI, true, -55, 0);
+    assert(memcmp(&animated, &blank, sizeof(blank)) != 0);
+    clock_render_connection(&steady, CLOCK_CONNECTION_RSSI, false, 0, 0);
+    assert(memcmp(&animated, &steady, sizeof(steady)) != 0);
+    clock_render_connection(&animated, CLOCK_CONNECTION_RSSI, true, -129, 0);
+    assert(memcmp(&animated, &steady, sizeof(steady)) == 0);
+    clock_render_connection(&animated, CLOCK_CONNECTION_IP, false, 0, 102);
+    assert(memcmp(&animated, &blank, sizeof(blank)) != 0);
+    clock_render_connection(&animated, CLOCK_CONNECTION_DONE, false, 0, 0);
+    assert(memcmp(&animated, &unsynced, sizeof(unsynced)) == 0);
 
     clock_frame_t scan = {0};
     for (unsigned col = 0; col < 4; ++col) {

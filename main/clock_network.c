@@ -8,6 +8,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -27,6 +28,11 @@ typedef enum {
     NETWORK_STARTED,
     NETWORK_DISCONNECTED,
     NETWORK_GOT_IP,
+} network_event_type_t;
+
+typedef struct {
+    network_event_type_t type;
+    uint8_t ip_last_octet;
 } network_event_t;
 
 static const char *TAG = "clock_network";
@@ -35,6 +41,7 @@ static SemaphoreHandle_t credentials_lock;
 static portMUX_TYPE status_lock = portMUX_INITIALIZER_UNLOCKED;
 static bool connected;
 static bool ap_active;
+static clock_network_display_t display_status;
 static credentials_t credentials;
 static bool have_credentials;
 static bool pending_credentials;
@@ -207,7 +214,16 @@ static void set_status(bool station, bool access_point)
     portENTER_CRITICAL(&status_lock);
     connected = station;
     ap_active = access_point;
+    display_status.connected = station;
     portEXIT_CRITICAL(&status_lock);
+}
+
+clock_network_display_t clock_network_display_status(void)
+{
+    portENTER_CRITICAL(&status_lock);
+    clock_network_display_t result = display_status;
+    portEXIT_CRITICAL(&status_lock);
+    return result;
 }
 
 clock_network_status_t clock_network_status(void)
@@ -226,16 +242,16 @@ clock_network_status_t clock_network_status(void)
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     (void)arg;
-    (void)data;
-    network_event_t event;
+    network_event_t event = {0};
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-        event = NETWORK_STARTED;
+        event.type = NETWORK_STARTED;
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
-        event = NETWORK_DISCONNECTED;
+        event.type = NETWORK_DISCONNECTED;
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         const ip_event_got_ip_t *ip = data;
         ESP_LOGI(TAG, "Station IP: " IPSTR, IP2STR(&ip->ip_info.ip));
-        event = NETWORK_GOT_IP;
+        event.type = NETWORK_GOT_IP;
+        event.ip_last_octet = esp_netif_htonl(ip->ip_info.ip.addr) & 0xff;
     } else {
         return;
     }
@@ -277,7 +293,7 @@ static void network_task(void *arg)
             }
             continue;
         }
-        if (event == NETWORK_GOT_IP) {
+        if (event.type == NETWORK_GOT_IP) {
             failures = 0;
             if (pending_credentials) {
                 esp_err_t err = save_successful_credentials();
@@ -296,13 +312,27 @@ static void network_task(void *arg)
                     ESP_LOGE(TAG, "Could not stop setup AP: %s", esp_err_to_name(err));
                 }
             }
-            set_status(true, setup_ap);
+            wifi_ap_record_t record;
+            esp_err_t rssi_err = esp_wifi_sta_get_ap_info(&record);
+            if (rssi_err != ESP_OK) {
+                ESP_LOGW(TAG, "Wi-Fi signal unavailable: %s", esp_err_to_name(rssi_err));
+            }
+            int64_t now = esp_timer_get_time();
+            portENTER_CRITICAL(&status_lock);
+            if (!connected) display_status.connected_at_us = now;
+            connected = true;
+            ap_active = setup_ap;
+            display_status.connected = true;
+            display_status.ip_last_octet = event.ip_last_octet;
+            display_status.rssi_valid = rssi_err == ESP_OK;
+            if (rssi_err == ESP_OK) display_status.rssi = record.rssi;
+            portEXIT_CRITICAL(&status_lock);
             esp_err_t err = clock_time_start_sync();
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Could not start NTP: %s", esp_err_to_name(err));
             }
         } else if (have_credentials) {
-            if (event == NETWORK_DISCONNECTED) {
+            if (event.type == NETWORK_DISCONNECTED) {
                 set_status(false, setup_ap);
                 ++failures;
                 if (failures >= RETRY_LIMIT && !setup_ap) {
