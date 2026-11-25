@@ -115,6 +115,8 @@ tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
 .ota-connection.live { color: #8df0ca; border-color: #3e8b76; background: #193d38; }
 .ota-connection.connecting { color: #ffda9d; }
 .ota-content { margin-top: 1.35rem; }
+.dashboard-link { display: inline-block; margin: 0 0 1rem; padding: .6rem .9rem; border: 1px solid #3c7d70; border-radius: 8px; background: #18433e; font-weight: 700; text-decoration: none; }
+.dashboard-link:hover { background: #24574d; }
 .ota-target { display: flex; align-items: end; gap: .6rem; margin-bottom: 1rem; }
 .ota-target > div { flex: 1; }
 .ota-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .65rem; }

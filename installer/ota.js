@@ -26,6 +26,8 @@ function controls() {
 
 function clearStatus() {
   for (const field of fields) $(`ota-${field}`).textContent = "—";
+  $("ota-dashboard").hidden = true;
+  $("ota-dashboard").removeAttribute("href");
 }
 
 function showStatus(data) {
@@ -67,6 +69,8 @@ async function poll(id) {
     if (id !== generation || uploading || stopped) return;
     const available = showStatus(JSON.parse(text));
     online = available;
+    $("ota-dashboard").href = `http://${target}/`;
+    $("ota-dashboard").hidden = false;
     connection("Live");
     $("ota-message").textContent = available ? `Connected to ${target}. Choose a compatible application image to update.` : "Clock is reachable, but OTA requires station-only Wi-Fi mode.";
   } catch (error) {
@@ -113,6 +117,7 @@ $("ota-upload").addEventListener("click", async () => {
   uploading = true;
   generation++;
   clearTimeout(timer);
+  clearStatus();
   controls();
   $("ota-result").textContent = "Uploading application firmware. Do not interrupt power or the network.";
   try {

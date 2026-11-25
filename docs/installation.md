@@ -25,7 +25,8 @@ required; opening a local HTML file directly does not work.
 The expandable OTA card checks `momentra.local` automatically. If that fails,
 enter the clock's private IPv4 address and select **Connect**. It shows live
 status and offers bundled ESP32 and ESP32-S3 application images or a local
-application `.bin`. Select the correct chip and compatible partition layout;
+application `.bin`. When the clock is reachable, **Open clock dashboard** opens
+its selected address in a new tab. Select the correct chip and compatible partition layout;
 the clock does not report its chip model. Never upload a merged factory image
 via OTA. The clock must be in station-only mode; check alarms and timers before
 updating. The display blanks during the upload and the clock reboots. OTA is
