@@ -27,6 +27,19 @@ typedef enum {
  */
 int clock_render(clock_frame_t *frame, bool valid, unsigned hour, unsigned minute,
                  bool format_12h, unsigned font);
+/** Draw two 24-hour 5x7 clocks, primary on top.
+ * @param frame Non-NULL destination.
+ * @param valid Whether both wall times are usable.
+ * @param first_hour Primary local hour, 0-23.
+ * @param first_minute Primary local minute, 0-59.
+ * @param second_hour Secondary local hour, 0-23.
+ * @param second_minute Secondary local minute, 0-59.
+ * @param blink Enable alternating separator visibility on both rows.
+ * @param second Current second, 0-59.
+ */
+void clock_render_dual(clock_frame_t *frame, bool valid, unsigned first_hour,
+                       unsigned first_minute, unsigned second_hour, unsigned second_minute,
+                       bool blink, unsigned second);
 /** Add blink and animation to an already rendered clock frame.
  * @param frame Clock frame to modify.
  * @param second Second within the minute, 0-59.

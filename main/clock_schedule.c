@@ -1,11 +1,10 @@
 #include "clock_schedule.h"
-
-/* Scheduling uses a fixed UTC+05:30 offset, independent of libc timezone state. */
-#define INDIA_OFFSET_SECONDS (5 * 3600 + 30 * 60)
+#include <string.h>
 
 void clock_schedule_init(clock_schedule_t *schedule)
 {
-    schedule->last_minute = -1;
+    schedule->last_minute = INT64_MIN;
+    schedule->timezone[0] = '\0';
 }
 
 clock_events_t clock_schedule_check(clock_schedule_t *schedule, const clock_config_t *config,
@@ -16,14 +15,20 @@ clock_events_t clock_schedule_check(clock_schedule_t *schedule, const clock_conf
         return events;
     }
 
-    /* Track an absolute local minute, not minute-of-day, so each minute is
-     * considered once even when the wall clock moves backwards. */
-    int64_t minute = (unix_seconds + INDIA_OFFSET_SECONDS) / 60;
+    int32_t offset;
+    if (!clock_timezone_offset(config->timezone_primary, unix_seconds, &offset)) return events;
+    if (strcmp(schedule->timezone, config->timezone_primary) != 0) {
+        strcpy(schedule->timezone, config->timezone_primary);
+        schedule->last_minute = INT64_MIN;
+    }
+    /* Local-minute tracking suppresses repeated minutes after an NTP or DST rollback. */
+    int64_t local_seconds = unix_seconds + offset;
+    int64_t minute = local_seconds >= 0 ? local_seconds / 60 : (local_seconds - 59) / 60;
     if (minute <= schedule->last_minute) {
         return events;
     }
     schedule->last_minute = minute;
-    unsigned minute_of_day = minute % (24 * 60);
+    unsigned minute_of_day = (minute % (24 * 60) + 24 * 60) % (24 * 60);
     unsigned hour = minute_of_day / 60;
     unsigned minute_of_hour = minute_of_day % 60;
     events.hourly = config->hourly_enabled && minute_of_hour == 0;

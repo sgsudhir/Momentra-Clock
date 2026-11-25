@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "clock_timezone.h"
 
 /* Counts are also used as exclusive upper bounds for API validation. Font IDs
  * 2-4 remain valid for compatibility, although they render as style 1. */
@@ -45,6 +46,9 @@ typedef struct {
     uint8_t feedback_enabled;  /**< Enable short action-confirmation beeps. */
     uint8_t colon_blink;       /**< Alternate the separator on and off each second. */
     uint8_t seconds_animation; /**< A value from clock_seconds_animation_t. */
+    char timezone_primary[CLOCK_TIMEZONE_NAME_SIZE];
+    char timezone_secondary[CLOCK_TIMEZONE_NAME_SIZE];
+    uint8_t timezone_secondary_enabled;
 } clock_config_t;
 
 /** Initialize *config with safe defaults, including disabled alarms.

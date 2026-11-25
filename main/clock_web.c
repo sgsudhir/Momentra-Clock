@@ -142,7 +142,8 @@ static esp_err_t settings_handler(httpd_req_t *req)
     bool has_feedback = clock_form_value(&form, "feedback_enabled") != NULL;
     bool has_blink = clock_form_value(&form, "colon_blink") != NULL;
     bool has_animation = clock_form_value(&form, "seconds_animation") != NULL;
-    if (form.count != 5U + has_feedback + has_blink + has_animation ||
+    const char *timezone = clock_form_value(&form, "timezone_primary");
+    if (form.count != 5U + has_feedback + has_blink + has_animation + (timezone != NULL) ||
         !clock_form_int(&form, "brightness", 0, 100, &brightness) ||
         !clock_form_int(&form, "font", 0, CLOCK_FONT_COUNT - 1, &font) ||
         !clock_form_int(&form, "format_12h", 0, 1, &format) ||
@@ -150,6 +151,7 @@ static esp_err_t settings_handler(httpd_req_t *req)
         !clock_form_int(&form, "hourly_pattern", 0, CLOCK_SOUND_COUNT - 1, &pattern) ||
         (has_feedback && !clock_form_int(&form, "feedback_enabled", 0, 1, &feedback)) ||
         (has_blink && !clock_form_int(&form, "colon_blink", 0, 1, &blink)) ||
+        (timezone && !clock_timezone_valid(timezone)) ||
         (has_animation && !clock_form_int(&form, "seconds_animation", 0,
                                           CLOCK_SECONDS_ANIMATION_COUNT - 1, &animation))) {
         return json_error(req, "400 Bad Request", "invalid settings");
@@ -165,11 +167,64 @@ static esp_err_t settings_handler(httpd_req_t *req)
     if (has_feedback) updated.feedback_enabled = feedback;
     if (has_blink) updated.colon_blink = blink;
     if (has_animation) updated.seconds_animation = animation;
+    if (timezone) {
+        memset(updated.timezone_primary, 0, sizeof(updated.timezone_primary));
+        strcpy(updated.timezone_primary, timezone);
+    }
     esp_err_t err = clock_store_set_if_unchanged(&old, &updated);
     if (err == ESP_ERR_INVALID_STATE) return json_error(req, "409 Conflict", "settings changed; retry");
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Settings save failed: %s", esp_err_to_name(err));
         return json_error(req, "500 Internal Server Error", "settings save failed");
+    }
+    clock_alarm_beep();
+    return json_ok(req);
+}
+
+static esp_err_t timezones_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    char chunk[512] = "[";
+    size_t used = 1;
+    esp_err_t err = ESP_OK;
+    for (size_t i = 0; err == ESP_OK && i < clock_timezone_count(); ++i) {
+        char item[CLOCK_TIMEZONE_NAME_SIZE + 4];
+        size_t length = snprintf(item, sizeof(item), "%s\"%s\"", i ? "," : "", clock_timezone_name(i));
+        if (used + length >= sizeof(chunk)) {
+            err = httpd_resp_send_chunk(req, chunk, used);
+            used = 0;
+        }
+        memcpy(chunk + used, item, length);
+        used += length;
+    }
+    if (err == ESP_OK) err = httpd_resp_send_chunk(req, chunk, used);
+    if (err == ESP_OK) err = httpd_resp_sendstr_chunk(req, "]");
+    if (err == ESP_OK) err = httpd_resp_sendstr_chunk(req, NULL);
+    return err;
+}
+
+static esp_err_t secondary_timezone_handler(httpd_req_t *req)
+{
+    clock_form_t form;
+    int enabled;
+    if (!read_form(req, &form) || form.count != 2 ||
+        !clock_form_int(&form, "timezone_secondary_enabled", 0, 1, &enabled)) {
+        return json_error(req, "400 Bad Request", "invalid second timezone");
+    }
+    const char *name = clock_form_value(&form, "timezone_secondary");
+    if (!clock_timezone_valid(name)) return json_error(req, "400 Bad Request", "invalid second timezone");
+    clock_config_t old;
+    clock_store_get(&old);
+    clock_config_t updated = old;
+    memset(updated.timezone_secondary, 0, sizeof(updated.timezone_secondary));
+    strcpy(updated.timezone_secondary, name);
+    updated.timezone_secondary_enabled = enabled;
+    esp_err_t err = clock_store_set_if_unchanged(&old, &updated);
+    if (err == ESP_ERR_INVALID_STATE) return json_error(req, "409 Conflict", "settings changed; retry");
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Second timezone save failed: %s", esp_err_to_name(err));
+        return json_error(req, "500 Internal Server Error", "second timezone save failed");
     }
     clock_alarm_beep();
     return json_ok(req);
@@ -411,7 +466,7 @@ esp_err_t clock_web_start(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.core_id = 0;
     config.stack_size = 8192;
-    config.max_uri_handlers = 11;
+    config.max_uri_handlers = 13;
     httpd_handle_t server;
     esp_err_t err = httpd_start(&server, &config);
     if (err != ESP_OK) return err;
@@ -419,6 +474,8 @@ esp_err_t clock_web_start(void)
         {.uri = "/", .method = HTTP_GET, .handler = index_handler},
         {.uri = "/api/status", .method = HTTP_GET, .handler = status_handler},
         {.uri = "/api/settings", .method = HTTP_POST, .handler = settings_handler},
+        {.uri = "/api/timezones", .method = HTTP_GET, .handler = timezones_handler},
+        {.uri = "/api/timezones", .method = HTTP_POST, .handler = secondary_timezone_handler},
         {.uri = "/api/alarm", .method = HTTP_POST, .handler = alarm_handler},
         {.uri = "/api/alarm/stop", .method = HTTP_POST, .handler = stop_handler},
         {.uri = "/api/timer", .method = HTTP_POST, .handler = timer_handler},

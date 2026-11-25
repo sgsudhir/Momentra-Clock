@@ -186,7 +186,7 @@ html[data-theme=sand] .timer-value{color:#8b5a24}
 <p id="connection-warning" class="notice" role="status" hidden>Can't reach the clock. Displayed information may be out of date; reconnect to refresh it.</p>
 
 <section class="hero" aria-label="Clock overview">
-  <div class="eyebrow">Your clock · Asia/Kolkata</div>
+  <div id="clock-zone" class="eyebrow">Your clock</div>
   <div id="clock" class="clock">--:--</div>
   <p id="clock-date" class="hero-sub">Waiting for clock status</p>
   <div class="hero-pills">
@@ -212,6 +212,9 @@ html[data-theme=sand] .timer-value{color:#8b5a24}
         <label class="field">Time format
           <select name="format_12h"><option value="0">24 hour</option><option value="1">12 hour</option></select>
         </label>
+        <label class="field full">Primary timezone
+          <select name="timezone_primary" required></select>
+        </label>
         <label class="field">Blink colon
           <select name="colon_blink"><option value="0">Off</option><option value="1">On</option></select>
         </label>
@@ -229,11 +232,32 @@ html[data-theme=sand] .timer-value{color:#8b5a24}
           <button id="feedback-toggle" type="button" class="secondary" aria-pressed="false">Feedback: Off</button>
         </div>
       </div>
-      <p class="hint">The panel does not show AM/PM. Seconds animations require a shorter font. Save settings to apply.</p>
+      <p class="hint">Alarms and hourly chimes use the primary timezone. The panel does not show AM/PM. Seconds animations require a shorter font and are unavailable with two timezones.</p>
       <button class="primary action">Save settings</button>
       </fieldset>
     </form>
   </section>
+
+  <details class="card">
+    <summary>Second timezone</summary>
+    <div class="details-body">
+      <p class="subtitle">Show two times on the panel: primary above, second below.</p>
+      <form id="second-zone">
+        <fieldset disabled>
+          <div class="fields">
+            <label class="field">Two-line display
+              <select name="timezone_secondary_enabled"><option value="0">Off</option><option value="1">On</option></select>
+            </label>
+            <label class="field">Second timezone
+              <select name="timezone_secondary" required></select>
+            </label>
+          </div>
+          <p class="hint">Both rows use 24-hour time and the small 5×7 font. Font, time format and seconds animation settings return when two-line display is turned off.</p>
+          <button class="primary action">Save second timezone</button>
+        </fieldset>
+      </form>
+    </div>
+  </details>
 
   <details class="card">
     <summary>Alarms</summary>
@@ -349,13 +373,14 @@ html[data-theme=sand] .timer-value{color:#8b5a24}
   </div>
 </div>
 <footer>Local controls are unauthenticated. Use only on a trusted network.
-  </br>Build: 24th Nov 2026.
-  </br>Nandi Park, Gotigere, Bangalore, India. 
+  <br>Momentra Clock · v<span id="firmware-version">—</span>
+  <br>Contact us: <a href="mailto:sgsudhir@hotmail.com">sgsudhir@hotmail.com</a>
 </footer>
 </main>
 <script>
 const $ = id => document.getElementById(id);
-let data, receivedAt, populated = false, refreshing = false, timerBusy = false, scanBusy = false;
+let data, receivedAt, populated = false, refreshing = false, timerBusy = false, scanBusy = false, zonesLoaded = false;
+let displayedDual = null;
 let clockAnchorMs = null, clockAnchorAt = 0, lastClockSync = 0;
 const duration = $('duration');
 for (const n of [5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 240, 300]) duration.add(new Option(n + ' seconds', n));
@@ -402,13 +427,29 @@ function renderClock() {
     $('clock-date').textContent = data ? 'Waiting for NTP time sync' : 'Waiting for clock status';
     return;
   }
-  const now = new Date(clockAnchorMs + 19800000 + (performance.now() - clockAnchorAt));
+  if (data.timezone_primary_offset === null) {
+    $('clock').textContent = '--:--';
+    $('clock-date').textContent = 'Timezone data unavailable for this date';
+    return;
+  }
+  const now = new Date(clockAnchorMs + data.timezone_primary_offset * 1000 + (performance.now() - clockAnchorAt));
   const hour = now.getUTCHours(), minute = String(now.getUTCMinutes()).padStart(2, '0');
   const seconds = String(now.getUTCSeconds()).padStart(2, '0');
-  $('clock').textContent = data.format_12h ? (hour % 12 || 12) + ':' + minute + ':' + seconds + (hour < 12 ? ' AM' : ' PM') : String(hour).padStart(2, '0') + ':' + minute + ':' + seconds;
+  $('clock').textContent = data.format_12h && !data.timezone_secondary_enabled ? (hour % 12 || 12) + ':' + minute + ':' + seconds + (hour < 12 ? ' AM' : ' PM') : String(hour).padStart(2, '0') + ':' + minute + ':' + seconds;
   $('clock-date').textContent = now.toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
 }
 function renderStatus() {
+  $('clock-zone').textContent = 'Your clock · ' + data.timezone_primary;
+  const dual = !!data.timezone_secondary_enabled;
+  $('settings').elements.font.disabled = dual;
+  $('settings').elements.seconds_animation.disabled = dual;
+  const format = $('settings').elements.format_12h;
+  format.disabled = dual;
+  if (dual !== displayedDual) {
+    format.value = dual ? '0' : String(data.format_12h);
+    displayedDual = dual;
+  }
+  $('firmware-version').textContent = data.firmware_version;
   $('ringing').hidden = !data.ringing;
   const active = data.alarms.map((_, i) => i + 1).filter(i => data.ringing_mask & (1 << (i - 1)));
   $('ringing-detail').textContent = active.length ? 'Ringing: ' + active.map(i => 'Alarm ' + i).join(', ') : 'Your alarm needs attention.';
@@ -442,12 +483,8 @@ function renderAlarms() {
     const item = document.createElement('li'), name = document.createElement('strong'), detail = document.createElement('span');
     name.textContent = 'Alarm ' + (i + 1);
     let remaining = 'Waiting for time sync';
-    if (clockAnchorMs !== null) {
-      const localSeconds = Math.floor((clockAnchorMs + 19800000 + performance.now() - clockAnchorAt) / 1000) % 86400;
-      const target = alarm.hour * 3600 + alarm.minute * 60;
-      let difference = target - localSeconds;
-      if (difference < 0) difference += 86400;
-      remaining = 'in ' + elapsed(difference);
+    if (data.alarm_next_seconds[i] !== null) {
+      remaining = 'in ' + elapsed(data.alarm_next_seconds[i] - (performance.now() - receivedAt) / 1000);
     }
     detail.textContent = String(alarm.hour).padStart(2, '0') + ':' + String(alarm.minute).padStart(2, '0') +
       ' · ' + (alarm.repeat ? 'Daily' : 'Once') + ' · ' + remaining;
@@ -512,6 +549,15 @@ async function refresh() {
     if (!response.ok) throw Error('Status unavailable');
     data = await response.json();
     receivedAt = performance.now();
+    if (!zonesLoaded) {
+      const zonesResponse = await fetch('/api/timezones', {cache:'no-store', signal:controller.signal});
+      if (!zonesResponse.ok) throw Error('Timezone list unavailable');
+      const zones = await zonesResponse.json();
+      for (const select of [$('settings').elements.timezone_primary, $('second-zone').elements.timezone_secondary]) {
+        select.replaceChildren(...zones.map(zone => new Option(zone, zone)));
+      }
+      zonesLoaded = true;
+    }
     if (!data.time_valid || data.unix_time_ms === null) {
       clockAnchorMs = null;
     } else if (clockAnchorMs === null || receivedAt - lastClockSync >= 15000) {
@@ -521,12 +567,15 @@ async function refresh() {
     }
     renderStatus();
     if (!populated) {
-      fill($('settings'), {...data, font: data.font >= 2 && data.font <= 4 ? 0 : data.font});
+      fill($('settings'), {...data, format_12h: data.timezone_secondary_enabled ? 0 : data.format_12h,
+        font: data.font >= 2 && data.font <= 4 ? 0 : data.font});
+      fill($('second-zone'), data);
       brightnessLabel();
       renderFeedback();
       fillAlarm();
       $('settings').querySelector('fieldset').disabled = false;
       $('alarm').querySelector('fieldset').disabled = false;
+      $('second-zone').querySelector('fieldset').disabled = false;
       populated = true;
     }
     $('connection').classList.remove('offline');
@@ -536,6 +585,7 @@ async function refresh() {
   } catch (error) {
     $('connection').classList.add('offline');
     $('connection-text').textContent = 'Disconnected';
+    $('connection-warning').textContent = 'Cannot load clock status or timezone list: ' + (error.message || 'connection failed') + '. Retry when the clock is reachable.';
     $('connection-warning').hidden = false;
     return false;
   } finally {
@@ -560,6 +610,11 @@ for (const id of ['settings', 'alarm', 'wifi']) {
     const form = event.currentTarget, button = form.querySelector('button:not([type=button])');
     submit(button, async () => {
       let body = new URLSearchParams(new FormData(form));
+      if (id === 'settings') {
+        body.set('font', form.elements.font.value);
+        body.set('seconds_animation', form.elements.seconds_animation.value);
+        body.set('format_12h', data.timezone_secondary_enabled ? data.format_12h : form.elements.format_12h.value);
+      }
       if (id === 'wifi') {
         const selected = $('wifi-networks').value;
         const ssid = selected === 'hidden' ? $('wifi-hidden').value : decodeSSID(selected.slice(5));
@@ -573,6 +628,15 @@ for (const id of ['settings', 'alarm', 'wifi']) {
     });
   };
 }
+$('second-zone').onsubmit = event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  submit(form.querySelector('button'), async () => {
+    await post('/api/timezones', new URLSearchParams(new FormData(form)));
+    message('Second timezone saved.');
+    await refresh();
+  });
+};
 $('settings').elements.brightness.oninput = brightnessLabel;
 $('feedback-toggle').onclick = () => {
   const field = $('settings').elements.feedback_enabled;

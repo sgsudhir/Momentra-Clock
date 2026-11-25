@@ -84,6 +84,35 @@ int main(void)
     clock_render(&unsynced, false, 0, 0, false, 0);
     clock_render(&invalid, true, 24, 0, false, 0);
     assert(memcmp(&unsynced, &invalid, sizeof(invalid)) == 0);
+    clock_frame_t dual, line;
+    clock_render_dual(&dual, true, 5, 30, 17, 45, false, 0);
+    clock_render(&line, true, 5, 30, false, 7);
+    for (unsigned y = 0; y < 7; ++y) {
+        assert(memcmp(dual.rows[y], line.rows[y + 4], sizeof(line.rows[0])) == 0);
+    }
+    clock_render(&line, true, 17, 45, false, 7);
+    for (unsigned y = 0; y < 7; ++y) {
+        assert(memcmp(dual.rows[y + 8], line.rows[y + 4], sizeof(line.rows[0])) == 0);
+    }
+    assert(!memcmp(dual.rows[7], (uint8_t[4]){0}, 4));
+    assert(!memcmp(dual.rows[15], (uint8_t[4]){0}, 4));
+    clock_render_dual(&dual, true, 0, 30, 12, 30, false, 0);
+    clock_render(&line, true, 0, 30, false, 7);
+    for (unsigned y = 0; y < 7; ++y) {
+        assert(memcmp(dual.rows[y], line.rows[y + 4], sizeof(line.rows[0])) == 0);
+    }
+    clock_render(&line, true, 12, 30, false, 7);
+    for (unsigned y = 0; y < 7; ++y) {
+        assert(memcmp(dual.rows[y + 8], line.rows[y + 4], sizeof(line.rows[0])) == 0);
+    }
+    clock_render_dual(&dual, true, 5, 30, 17, 45, true, 1);
+    int line_separator = clock_render(&line, true, 5, 30, false, 7);
+    clock_render_seconds(&line, 1, 0, true, CLOCK_SECONDS_NONE, 7, line_separator);
+    for (unsigned y = 0; y < 7; ++y) {
+        assert(memcmp(dual.rows[y], line.rows[y + 4], sizeof(line.rows[0])) == 0);
+    }
+    clock_render_dual(&dual, true, 5, 30, 24, 0, false, 0);
+    assert(memcmp(&dual, &unsynced, sizeof(dual)) == 0);
     clock_frame_t stopwatch, reminder;
     clock_render_timer(&stopwatch, false, 12, 34, 56, 0);
     clock_render_timer(&reminder, true, 12, 34, 56, 0);
@@ -241,6 +270,12 @@ int main(void)
     assert(clock_form_parse(&form, wifi, strlen(wifi)));
     assert(strcmp(clock_form_value(&form, "ssid"), "Home WiFi") == 0);
     assert(strcmp(clock_form_value(&form, "password"), "a&b=c") == 0);
+    const char *zones = "timezone_secondary_enabled=1&timezone_secondary=America%2FNew_York";
+    assert(clock_form_parse(&form, zones, strlen(zones)));
+    assert(strcmp(clock_form_value(&form, "timezone_secondary_enabled"), "1") == 0);
+    assert(strcmp(clock_form_value(&form, "timezone_secondary"), "America/New_York") == 0);
+    const char *long_name = "abcdefghijklmnopqrstuvwxyzabcdef=1";
+    assert(!clock_form_parse(&form, long_name, strlen(long_name)));
     const char *duplicate = "a=1&%61=2";
     assert(!clock_form_parse(&form, duplicate, strlen(duplicate)));
     const char *bad_escape = "a=%00";

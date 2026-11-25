@@ -24,7 +24,8 @@
   1/4-scan monochrome P10 HUB12 panel. White, red, green, blue, yellow and
   pink are possible fixed LED colors on matching single-color variants; each
   panel model needs verification. RGB and multiple panels are not supported.
-  The fixed timezone is Asia/Kolkata, UTC+05:30.
+  Select a primary IANA timezone and, optionally, display a second timezone.
+  Asia/Kolkata is the default.
 - Serves a local dashboard for display settings, five alarms, a stopwatch,
   one reminder, Wi-Fi setup, restart and firmware upload.
 - Saves display settings and alarms in NVS; timers are volatile. A buzzer
@@ -59,7 +60,7 @@ screenshots.
 ## Reading conventions
 
 - **GPIO** means the ESP32 chip GPIO number, not a connector pin position.
-- **Local time** is Asia/Kolkata. API Unix timestamps are UTC epoch values.
+- **Local time** follows the selected primary timezone (Asia/Kolkata by default). API Unix timestamps are UTC epoch values.
 - **Persistent** means stored in NVS and intended to survive restart;
   **volatile** means lost on restart.
 - API examples use `192.168.1.50` as a placeholder, not a fixed device address.

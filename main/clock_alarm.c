@@ -1,4 +1,5 @@
 #include "clock_alarm.h"
+#include "clock_pins.h"
 
 #include "clock_config.h"
 #include "clock_schedule.h"
@@ -192,8 +193,7 @@ esp_err_t clock_alarm_start(void)
 {
     if (CONFIG_CLOCK_PIN_BUZZER >= 0) {
         int pin = CONFIG_CLOCK_PIN_BUZZER;
-        if (!GPIO_IS_VALID_OUTPUT_GPIO(pin) || pin == 0 || pin == 1 || pin == 2 ||
-            pin == 3 || pin == 5 || (pin >= 6 && pin <= 12) || pin == 15) {
+        if (!clock_pin_safe(pin)) {
             ESP_LOGE(TAG, "Unsafe buzzer GPIO: %d", pin);
             return ESP_ERR_INVALID_ARG;
         }

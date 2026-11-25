@@ -20,37 +20,44 @@ menu "P10 clock hardware"
 
     config CLOCK_PIN_DATA
         int "Panel DATA GPIO (-1 means unconfigured)"
-        range -1 33
+        range -1 48 if IDF_TARGET_ESP32S3
+        range -1 33 if !IDF_TARGET_ESP32S3
         default -1
 
     config CLOCK_PIN_CLOCK
         int "Panel CLOCK GPIO (-1 means unconfigured)"
-        range -1 33
+        range -1 48 if IDF_TARGET_ESP32S3
+        range -1 33 if !IDF_TARGET_ESP32S3
         default -1
 
     config CLOCK_PIN_LATCH
         int "Panel LATCH GPIO (-1 means unconfigured)"
-        range -1 33
+        range -1 48 if IDF_TARGET_ESP32S3
+        range -1 33 if !IDF_TARGET_ESP32S3
         default -1
 
     config CLOCK_PIN_OE
         int "Panel output-enable GPIO (-1 means unconfigured)"
-        range -1 33
+        range -1 48 if IDF_TARGET_ESP32S3
+        range -1 33 if !IDF_TARGET_ESP32S3
         default -1
 
     config CLOCK_PIN_A
         int "Panel row A GPIO (-1 means unconfigured)"
-        range -1 33
+        range -1 48 if IDF_TARGET_ESP32S3
+        range -1 33 if !IDF_TARGET_ESP32S3
         default -1
 
     config CLOCK_PIN_B
         int "Panel row B GPIO (-1 means unconfigured)"
-        range -1 33
+        range -1 48 if IDF_TARGET_ESP32S3
+        range -1 33 if !IDF_TARGET_ESP32S3
         default -1
 
     config CLOCK_PIN_BUZZER
         int "Active buzzer GPIO (-1 means unconfigured)"
-        range -1 33
+        range -1 48 if IDF_TARGET_ESP32S3
+        range -1 33 if !IDF_TARGET_ESP32S3
         default -1
 
 endmenu

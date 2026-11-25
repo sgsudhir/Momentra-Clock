@@ -29,8 +29,8 @@ parts in hand.
 
 ## ESP32 boards and compatibility
 
-The application targets the **original dual-core ESP32** (`esp32` target),
-with the default GPIOs and a 4 MB flash layout. The following are candidates
+The application has separate **original ESP32** and **ESP32-S3** builds,
+with different default GPIOs and a 4 MB flash layout. The following are candidates
 for the same firmware configuration, not a hardware-tested compatibility
 certification:
 
@@ -39,7 +39,9 @@ certification:
 | Espressif **ESP32-DevKitC-32E**, V4, with ESP32-WROOM-32E | Candidate without source or pin-configuration changes | Official board lists 4 MB flash and breaks out all seven selected GPIOs. Verify actual board revision, panel and power circuit. |
 | Espressif **ESP32-DevKitC-32UE**, V4, with ESP32-WROOM-32UE | Candidate without source or pin-configuration changes | Official board lists 4 MB and the same V4 header mapping; install the appropriate external antenna as specified by the manufacturer. |
 | Other original-ESP32 boards with ESP32-WROOM-32 / 32E | Conditional | Confirm at least 4 MB flash, all listed GPIOs exposed and unused by board hardware, correct power and suitable module/board design. Labels and header locations vary. |
-| ESP32-S2, S3, C3, C6 and other ESP32-family chips | Not drop-in targets | Different chip targets, pin availability or peripherals require a separate port, configuration and testing. |
+| Espressif **ESP32-S3-DevKitC-1 N16R8** | S3 image and mapping below | 16 MB flash and 8 MB octal PSRAM; mapping and panel driver have not been physically verified. |
+| Other ESP32-S3 boards | Conditional | Use the S3 image only if its pin mapping is safe for the actual module and board; otherwise rebuild with suitable GPIOs. At least 4 MB flash is required. |
+| ESP32-S2, C3, C6 and other ESP32-family chips | Not supported by Momentra presets | Different chip targets, pin availability or peripherals require a separate port, configuration and testing. |
 
 “Without changes” means the existing **default pin mapping, polarity and
 partition layout** are suitable only if the actual connected panel and
@@ -70,6 +72,8 @@ firmware have not been verified on hardware.
 
 ## Default GPIO and panel signal mapping
 
+### Original ESP32
+
 | ESP32 GPIO | DevKitC V4 header / label | Connect to | Function |
 | ---: | --- | --- | --- |
 | 23 | J3-2 / IO23 | Panel DATA, through level shifter if required | Serial pixel data; default data polarity active-low. |
@@ -80,6 +84,33 @@ firmware have not been verified on hardware.
 | 25 | J2-9 / IO25 | Panel B | Row address bit 1. |
 | 26 | J2-10 / IO26 | Buzzer driver input, **not the buzzer load** | Active-high buzzer control. |
 | GND | J3-1, J3-7 or J2-14 / GND | Panel, buffer and driver ground | Shared signal reference; size panel power return separately. |
+
+### ESP32-S3-DevKitC-1 N16R8
+
+This is the S3 image's **example mapping**, not the original ESP32 mapping.
+All selected signals are on the board's J1 header. The panel and buzzer have
+not yet been verified with this board. Confirm the board revision and actual
+labels before wiring, and use the panel input and level shifting described
+below.
+
+| Signal | ESP32-S3 GPIO | DevKitC-1 J1 header |
+| --- | ---: | --- |
+| DATA | 4 | 4 |
+| CLK | 5 | 5 |
+| LATCH / STB | 6 | 6 |
+| OE | 7 | 7 |
+| A | 15 | 8 |
+| B | 16 | 9 |
+| Buzzer driver input | 17 | 10 |
+| Common ground | GND | 22 |
+
+The N16R8 has 16 MB flash and 8 MB octal PSRAM. GPIO35–37 are used by
+flash/PSRAM; GPIO19–20 are native USB, GPIO43–44 are serial, and GPIO38 or
+GPIO48 may drive the onboard LED depending on board revision. Do not use
+them for this mapping. Check the
+[Espressif DevKitC-1 guide](https://documentation.espressif.com/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide_v1.1.html)
+for the exact revision and power requirements. The provided S3 firmware uses
+the first 4 MB of flash; it does not enable or require PSRAM.
 
 Use the panel's marked signal names and its own documentation. Some panels
 label DATA as `DIN`, CLK as `SCLK` and LATCH as `STB`; only treat labels as
@@ -110,7 +141,7 @@ complete power-safety schematic:
                                ├──────────── Buffer GND
                                └──────────── ESP32 GND
 
-       ESP32                     3.3 V -> panel logic, if needed       PANEL
+       Original ESP32            3.3 V -> panel logic, if needed       PANEL
        IO23 ───────────────────> buffer ────────────────────────────> DATA
        IO18 ───────────────────> buffer ────────────────────────────> CLK
        IO19 ───────────────────> buffer ────────────────────────────> LATCH
@@ -119,6 +150,9 @@ complete power-safety schematic:
        IO25 ───────────────────> buffer ────────────────────────────> B
        IO26 ─────> base resistor + 2N2222 driver ───────────────────> buzzer -
 ```
+
+For the S3, substitute the GPIOs from the table above; the power, level
+shifter and buzzer-driver precautions are the same.
 
 `*` Only if the actual component is specified for that voltage. Each branch
 needs wiring and protection appropriate for its current. The board may
@@ -182,14 +216,16 @@ buzzer. It is not a suitable design for an arbitrary high-current load.
                         │
                        GND ─────────────── ESP32 GND
 
- ESP32 GPIO26 ── R1 1 kΩ ──┬── B (Q1)
+ ESP32 GPIO26* ─ R1 1 kΩ ──┬── B (Q1)
                             │
                          R2 100 kΩ
                             │
                            GND
 ```
 
-R1 limits GPIO/base current. R2 pulls the transistor base low while GPIO26
+`*` Use GPIO17 with the S3 default mapping instead of GPIO26.
+
+R1 limits GPIO/base current. R2 pulls the transistor base low while the GPIO
 is high-impedance during reset; it does not protect against a driven-high
 GPIO or all power faults. Q1's collector goes to buzzer negative, emitter to
 ground, and the buzzer positive to its rated supply. **Do not assume the

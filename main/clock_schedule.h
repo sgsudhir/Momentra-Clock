@@ -8,6 +8,7 @@
 /** Last local-epoch minute processed; prevents repeat triggers after clock rollback. */
 typedef struct {
     int64_t last_minute;
+    char timezone[CLOCK_TIMEZONE_NAME_SIZE];
 } clock_schedule_t;
 
 /** Events due in one minute; bit i in alarms corresponds to alarm slot i. */

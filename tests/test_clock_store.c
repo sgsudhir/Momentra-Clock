@@ -18,6 +18,15 @@ static struct {
     {"feedback", false, 0},
     {"colon_blink", false, 0},
     {"seconds_anim", false, 0},
+    {"tz2_enabled", false, 0},
+};
+static struct {
+    const char *key;
+    bool exists;
+    char value[CLOCK_TIMEZONE_NAME_SIZE];
+} saved_zones[] = {
+    {"tz_primary", false, ""},
+    {"tz_secondary", false, ""},
 };
 
 esp_err_t nvs_open(const char *name, int mode, nvs_handle_t *handle)
@@ -79,6 +88,37 @@ esp_err_t nvs_set_u8(nvs_handle_t handle, const char *key, uint8_t value)
     return ESP_FAIL;
 }
 
+esp_err_t nvs_get_str(nvs_handle_t handle, const char *key, char *value, size_t *size)
+{
+    (void)handle;
+    for (unsigned i = 0; i < sizeof(saved_zones) / sizeof(saved_zones[0]); ++i) {
+        if (strcmp(key, saved_zones[i].key) == 0) {
+            if (!saved_zones[i].exists) return ESP_ERR_NVS_NOT_FOUND;
+            size_t length = strlen(saved_zones[i].value) + 1;
+            assert(*size >= length);
+            memcpy(value, saved_zones[i].value, length);
+            *size = length;
+            return ESP_OK;
+        }
+    }
+    assert(false);
+    return ESP_FAIL;
+}
+
+esp_err_t nvs_set_str(nvs_handle_t handle, const char *key, const char *value)
+{
+    (void)handle;
+    for (unsigned i = 0; i < sizeof(saved_zones) / sizeof(saved_zones[0]); ++i) {
+        if (strcmp(key, saved_zones[i].key) == 0) {
+            strcpy(saved_zones[i].value, value);
+            saved_zones[i].exists = true;
+            return ESP_OK;
+        }
+    }
+    assert(false);
+    return ESP_FAIL;
+}
+
 esp_err_t nvs_commit(nvs_handle_t handle)
 {
     (void)handle;
@@ -98,6 +138,11 @@ int main(void)
     clock_store_get(&config);
     assert(config.brightness == 50 && config.feedback_enabled == 1 &&
            config.colon_blink == 0 && config.seconds_animation == CLOCK_SECONDS_NONE);
+    assert(strcmp(config.timezone_primary, "Asia/Kolkata") == 0);
+    assert(strcmp(config.timezone_secondary, "Etc/UTC") == 0);
+    strcpy(config.timezone_primary, "Europe/London");
+    strcpy(config.timezone_secondary, "America/New_York");
+    config.timezone_secondary_enabled = 1;
     config.alarms[0] = (clock_alarm_t){1, 7, 30, ALARM_ONCE, 10};
     config.alarms[1] = (clock_alarm_t){1, 7, 30, ALARM_DAILY, 30};
     assert(clock_store_set(&config) == ESP_OK);
@@ -137,6 +182,9 @@ int main(void)
     assert(config.feedback_enabled == 0 && config.colon_blink == 1 &&
            config.seconds_animation == CLOCK_SECONDS_PROGRESS && config.brightness == 75 &&
            config.alarms[0].hour == 8);
+    assert(strcmp(config.timezone_primary, "Europe/London") == 0 &&
+           strcmp(config.timezone_secondary, "America/New_York") == 0 &&
+           config.timezone_secondary_enabled == 1);
     for (unsigned effect = CLOCK_SECONDS_BOUNCE; effect <= CLOCK_SECONDS_JUMP; ++effect) {
         config.font = effect == CLOCK_SECONDS_BOUNCE ? 13 : 14;
         config.seconds_animation = effect;
@@ -160,11 +208,14 @@ int main(void)
     for (unsigned i = 0; i < sizeof(saved_options) / sizeof(saved_options[0]); ++i) {
         saved_options[i].exists = false;
     }
+    for (unsigned i = 0; i < sizeof(saved_zones) / sizeof(saved_zones[0]); ++i) saved_zones[i].exists = false;
     assert(clock_store_init() == ESP_OK);
     clock_store_get(&config);
     assert(config.feedback_enabled == 1 && config.colon_blink == 0 &&
            config.seconds_animation == CLOCK_SECONDS_NONE && config.brightness == 75 &&
            config.alarms[0].hour == 8);
+    assert(strcmp(config.timezone_primary, "Asia/Kolkata") == 0 &&
+           strcmp(config.timezone_secondary, "Etc/UTC") == 0 && !config.timezone_secondary_enabled);
     config.feedback_enabled = 2;
     assert(clock_store_set(&config) == ESP_ERR_INVALID_ARG);
     config.feedback_enabled = 1;

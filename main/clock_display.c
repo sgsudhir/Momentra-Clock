@@ -5,11 +5,13 @@
 
 #include "clock_render.h"
 #include "clock_network.h"
+#include "clock_pins.h"
 #include "clock_scan.h"
 #include "clock_store.h"
 #include "clock_time.h"
 #include "clock_timers.h"
 #include "driver/gpio.h"
+#include "driver/gptimer.h"
 #include "driver/ledc.h"
 #include "driver/spi_master.h"
 #include "esp_check.h"
@@ -46,13 +48,8 @@ static bool paused; /* Requested pause state, protected by pause_lock. */
 static bool ready;  /* Scanner health/startup state, protected by pause_lock. */
 #define DISPLAY_PAUSED BIT0
 #define DISPLAY_RUNNING BIT1
-
-/** Reject non-output, boot-strapping, serial and flash-reserved GPIOs. */
-static bool pin_safe(int pin)
-{
-    return GPIO_IS_VALID_OUTPUT_GPIO(pin) && pin != 0 && pin != 1 && pin != 2 &&
-           pin != 3 && pin != 5 && !(pin >= 6 && pin <= 12) && pin != 15;
-}
+#define DISPLAY_INITIALIZED BIT2
+#define DISPLAY_INIT_FAILED BIT3
 
 /** Check panel pins are safe, unique and do not conflict with the buzzer. */
 static bool pins_valid(void)
@@ -60,7 +57,7 @@ static bool pins_valid(void)
     int pins[] = {CONFIG_CLOCK_PIN_DATA, CONFIG_CLOCK_PIN_CLOCK, CONFIG_CLOCK_PIN_LATCH,
                   CONFIG_CLOCK_PIN_OE, CONFIG_CLOCK_PIN_A, CONFIG_CLOCK_PIN_B};
     for (unsigned i = 0; i < sizeof(pins) / sizeof(pins[0]); ++i) {
-        if (!pin_safe(pins[i]) || pins[i] == CONFIG_CLOCK_PIN_BUZZER) return false;
+        if (!clock_pin_safe(pins[i]) || pins[i] == CONFIG_CLOCK_PIN_BUZZER) return false;
         for (unsigned j = 0; j < i; ++j) {
             if (pins[i] == pins[j]) return false;
         }
@@ -160,13 +157,23 @@ static void render_task(void *arg)
             } else {
                 clock_time_snapshot_t time_state = clock_time_snapshot();
                 struct tm local = {0};
-                if (time_state.valid) localtime_r(&time_state.unix_time, &local);
-                int separator_x = clock_render(&frame, time_state.valid, local.tm_hour, local.tm_min,
-                                               config.format_12h, config.font);
-                if (time_state.valid) {
-                    clock_render_seconds(&frame, local.tm_sec, time_state.unix_time_ms % 1000,
-                                         config.colon_blink, config.seconds_animation,
-                                         config.font, separator_x);
+                bool local_valid = time_state.valid &&
+                    clock_timezone_local(config.timezone_primary, time_state.unix_time, &local);
+                if (config.timezone_secondary_enabled) {
+                    struct tm secondary = {0};
+                    bool both_valid = local_valid &&
+                        clock_timezone_local(config.timezone_secondary, time_state.unix_time, &secondary);
+                    clock_render_dual(&frame, both_valid, local.tm_hour, local.tm_min,
+                                      secondary.tm_hour, secondary.tm_min,
+                                      config.colon_blink, local.tm_sec);
+                } else {
+                    int separator_x = clock_render(&frame, local_valid, local.tm_hour, local.tm_min,
+                                                   config.format_12h, config.font);
+                    if (local_valid) {
+                        clock_render_seconds(&frame, local.tm_sec, time_state.unix_time_ms % 1000,
+                                             config.colon_blink, config.seconds_animation,
+                                             config.font, separator_x);
+                    }
                 }
             }
         }
@@ -179,6 +186,57 @@ static void render_task(void *arg)
     vTaskDelete(NULL);
 }
 
+static bool IRAM_ATTR scan_timer_alarm(gptimer_handle_t timer,
+                                       const gptimer_alarm_event_data_t *event, void *arg)
+{
+    (void)timer;
+    (void)event;
+    BaseType_t awakened = pdFALSE;
+    vTaskNotifyGiveFromISR((TaskHandle_t)arg, &awakened);
+    return awakened == pdTRUE;
+}
+
+static esp_err_t scan_timer_start(gptimer_handle_t *timer)
+{
+    const gptimer_config_t config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 1000000,
+    };
+    const gptimer_event_callbacks_t callbacks = {.on_alarm = scan_timer_alarm};
+    const gptimer_alarm_config_t alarm = {
+        .alarm_count = 1000,
+        .reload_count = 0,
+        .flags.auto_reload_on_alarm = true,
+    };
+    esp_err_t err = gptimer_new_timer(&config, timer);
+    if (err != ESP_OK) return err;
+    bool enabled = false;
+    err = gptimer_register_event_callbacks(*timer, &callbacks, xTaskGetCurrentTaskHandle());
+    if (err == ESP_OK) err = gptimer_set_alarm_action(*timer, &alarm);
+    if (err == ESP_OK) {
+        err = gptimer_enable(*timer);
+        enabled = err == ESP_OK;
+    }
+    if (err == ESP_OK) err = gptimer_start(*timer);
+    if (err != ESP_OK) {
+        if (enabled) {
+            esp_err_t cleanup = gptimer_disable(*timer);
+            if (cleanup != ESP_OK) {
+                ESP_LOGE(TAG, "Panel timer disable failed: %s", esp_err_to_name(cleanup));
+                xEventGroupSetBits(display_events, DISPLAY_INIT_FAILED);
+                /* The ISR may still reference this task. */
+                vTaskSuspend(NULL);
+                return err;
+            }
+        }
+        esp_err_t cleanup = gptimer_del_timer(*timer);
+        if (cleanup != ESP_OK) ESP_LOGE(TAG, "Panel timer cleanup failed: %s", esp_err_to_name(cleanup));
+        *timer = NULL;
+    }
+    return err;
+}
+
 /** Core-1 panel scan worker.
  * @param arg Unused. Acknowledges pauses and stops on a hardware error.
  */
@@ -188,20 +246,36 @@ static void display_task(void *arg)
     clock_frame_t frame = {0};
     unsigned row = 0;
     unsigned brightness = 0;
+    gptimer_handle_t timer = NULL;
+    esp_err_t err = scan_timer_start(&timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Panel timer setup failed: %s", esp_err_to_name(err));
+        xEventGroupSetBits(display_events, DISPLAY_INIT_FAILED);
+        vTaskDelete(NULL);
+        return;
+    }
+    set_ready(true);
+    xEventGroupSetBits(display_events, DISPLAY_INITIALIZED);
     for (;;) {
+        if (!clock_display_is_ready()) break;
         if (is_paused()) {
             esp_err_t err = ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Panel pause failed: %s", esp_err_to_name(err));
                 set_ready(false);
-                vTaskDelete(NULL);
-                return;
+                break;
             }
             xEventGroupClearBits(display_events, DISPLAY_RUNNING);
             xEventGroupSetBits(display_events, DISPLAY_PAUSED);
             vTaskDelay(pdMS_TO_TICKS(10));
             continue;
         }
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000)) == 0) {
+            ESP_LOGE(TAG, "Panel timer stopped signaling");
+            set_ready(false);
+            break;
+        }
+        if (is_paused()) continue;
         xEventGroupClearBits(display_events, DISPLAY_PAUSED);
         xEventGroupSetBits(display_events, DISPLAY_RUNNING);
         /* Switch frames only on a full-scan boundary. */
@@ -211,28 +285,32 @@ static void display_task(void *arg)
             brightness = rendered_brightness;
             portEXIT_CRITICAL(&frame_lock);
         }
-        esp_err_t err = refresh_row(&frame, row, brightness);
+        err = refresh_row(&frame, row, brightness);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Display refresh stopped: %s", esp_err_to_name(err));
-            esp_err_t blank_err = ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
-            if (blank_err != ESP_OK) {
-                ESP_LOGE(TAG, "Panel blank failed: %s", esp_err_to_name(blank_err));
-            }
             set_ready(false);
-            vTaskDelete(NULL);
-            return;
+            break;
         }
         row = (row + 1) % 4;
-        vTaskDelay(pdMS_TO_TICKS(1));
     }
+    err = ledc_stop(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+    if (err != ESP_OK) ESP_LOGE(TAG, "Panel blank failed: %s", esp_err_to_name(err));
+    err = gptimer_stop(timer);
+    if (err != ESP_OK) ESP_LOGE(TAG, "Panel timer stop failed: %s", esp_err_to_name(err));
+    err = gptimer_disable(timer);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Panel timer disable failed: %s", esp_err_to_name(err));
+        /* The ISR may still reference this task. */
+        vTaskSuspend(NULL);
+        return;
+    }
+    err = gptimer_del_timer(timer);
+    if (err != ESP_OK) ESP_LOGE(TAG, "Panel timer cleanup failed: %s", esp_err_to_name(err));
+    vTaskDelete(NULL);
 }
 
 esp_err_t clock_display_start(void)
 {
-    if (pdMS_TO_TICKS(1) == 0) {
-        ESP_LOGE(TAG, "Panel refresh requires a FreeRTOS tick of at least 1000 Hz");
-        return ESP_ERR_INVALID_STATE;
-    }
     if (!pins_valid()) {
         ESP_LOGE(TAG, "Panel GPIOs are missing, unsafe, duplicated or conflict with the buzzer");
         return ESP_ERR_INVALID_ARG;
@@ -267,12 +345,17 @@ esp_err_t clock_display_start(void)
     spi_device_interface_config_t device = {.clock_speed_hz = 4000000, .mode = 0,
                                             .spics_io_num = -1, .queue_size = 1};
     ESP_RETURN_ON_ERROR(spi_bus_add_device(SPI3_HOST, &device, &spi), TAG, "panel SPI device failed");
-    set_ready(true);
-    if (xTaskCreatePinnedToCore(render_task, "clock_render", 4096, NULL, 5, NULL, 0) != pdPASS) {
-        set_ready(false);
+    if (xTaskCreatePinnedToCore(display_task, "clock_display", 4096, NULL, 8, NULL, 1) != pdPASS) {
         return ESP_ERR_NO_MEM;
     }
-    if (xTaskCreatePinnedToCore(display_task, "clock_display", 4096, NULL, 8, NULL, 1) != pdPASS) {
+    EventBits_t bits = xEventGroupWaitBits(display_events, DISPLAY_INITIALIZED | DISPLAY_INIT_FAILED,
+                                           pdFALSE, pdFALSE, pdMS_TO_TICKS(1000));
+    if (!(bits & DISPLAY_INITIALIZED)) {
+        ESP_LOGE(TAG, "Panel scanner initialization failed or timed out");
+        set_ready(false);
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (xTaskCreatePinnedToCore(render_task, "clock_render", 4096, NULL, 5, NULL, 0) != pdPASS) {
         set_ready(false);
         return ESP_ERR_NO_MEM;
     }

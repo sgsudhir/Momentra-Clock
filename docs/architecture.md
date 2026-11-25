@@ -49,7 +49,7 @@ to ESP-IDF task creation. Actual intervals are subject to scheduling and load.
 
 | Task | Core | Priority | Stack | Behavior |
 | --- | ---: | ---: | ---: | --- |
-| `clock_display` | 1 | 8 | 4096 B | Shifts one row group, updates latch/row/OE and delays 1 ms; while paused, acknowledges and delays 10 ms. |
+| `clock_display` | 1 | 8 | 4096 B | Wakes on a 1 ms hardware-timer alarm, shifts one row group and updates latch/row/OE; while paused, acknowledges and delays 10 ms. |
 | `clock_render` | 0 | 5 | 4096 B | Builds a complete frame; delays 10 ms for a running stopwatch, otherwise 100 ms. |
 | `clock_alarm` | 0 | 5 | 4096 B | Updates timers, schedules and buzzer; delays 25 ms during a scheduled alarm, otherwise 50 ms. |
 | `clock_network` | 0 | 5 | 4096 B | Consumes Wi-Fi events; a 30 s queue timeout permits reconnect attempts. |
@@ -59,9 +59,9 @@ to ESP-IDF task creation. Actual intervals are subject to scheduling and load.
 
 `CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0` is set in project defaults. Core 1 is
 **not exclusively reserved**: interrupts, ESP-IDF system tasks and
-flash/cache operations can affect scanning. A 1 ms delay per row is not a
-guaranteed refresh period or flicker-free performance. Measure the actual
-panel under network and flash load.
+flash/cache operations can affect scanning. The hardware timer provides the
+1 ms wakeup cadence, but task scheduling and peripheral operations still
+affect actual row timing. Measure the panel under network and flash load.
 
 ## Frame production and scanning
 
@@ -79,6 +79,8 @@ single-color variants and hardware limitations.
    it for the complete four-address scan.
 5. Each group is encoded as 16 SPI bytes, shifted at 4 MHz in mode 0,
    blanked, latched and addressed. LEDC drives OE at 20 kHz with 8-bit duty.
+   The core-1 task creates the hardware timer and its interrupt, then waits for
+   each 1 ms alarm. A missed notification is coalesced rather than replayed.
 
 This boundary avoids mixing parts of two rendered frames; it does not prevent
 all timing jitter. DATA polarity and OE polarity are build configuration
@@ -105,8 +107,9 @@ pending, then promoted on connection. The previously saved set is not
 overwritten until promotion. The device retries after failures; the setup AP
 is enabled after five failed connection attempts.
 
-[`clock_time.c`](../main/clock_time.c) sets `TZ=IST-5:30`, initializes
-`pool.ntp.org` and requests 60-second synchronization intervals. Successful
+[`clock_time.c`](../main/clock_time.c) initializes `pool.ntp.org` and requests
+60-second synchronization intervals. [`clock_timezone.c`](../main/clock_timezone.c)
+converts UTC using bundled IANA tzdb 2026f rules for 1970–2100. Successful
 callbacks record monotonic time. Freshness is valid only for elapsed time
 strictly below 12 hours; an invalid or backward monotonic reference is stale.
 Wall time and freshness serve different purposes: wall time is used for
@@ -115,12 +118,15 @@ Short Wi-Fi interruptions do not immediately invalidate an earlier sync.
 
 ## Alarms, timers and sound
 
-The schedule processes each new absolute local minute once and examines only
+The schedule uses the primary timezone, processes each new absolute local minute once and examines only
 the current minute. Missed minutes are not replayed; backward corrections are
 suppressed until the clock advances beyond the last processed minute. A
 restart resets this deduplication state. A one-shot alarm is persisted as
 disabled before sounding; a power failure in between can skip it. Daily
-alarms can trigger again if the device reboots during the same minute.
+alarms can trigger again if the device reboots during the same minute. A
+primary timezone change resets minute deduplication; a DST rollback suppresses
+repeated local minutes, while a spring-forward gap has no matching minute.
+Timezone rules can change and need a firmware update to refresh.
 
 The alarm worker is the sole buzzer owner. Scheduled alarms take precedence
 over an active hourly chime; scheduled sound takes precedence over a reminder,

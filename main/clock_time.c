@@ -1,6 +1,5 @@
 #include "clock_time.h"
 
-#include <stdlib.h>
 #include <sys/time.h>
 
 #include "clock_freshness.h"
@@ -30,12 +29,7 @@ static void on_time_sync(struct timeval *time_value)
 
 esp_err_t clock_time_init(void)
 {
-    /* POSIX TZ signs are reversed: IST-5:30 denotes UTC+05:30. SNTP is
-     * initialized now but started only after the station obtains an IP. */
-    if (setenv("TZ", "IST-5:30", 1) != 0) {
-        return ESP_FAIL;
-    }
-    tzset();
+    /* SNTP is initialized now but started only after the station obtains an IP. */
     esp_sntp_set_sync_interval(60 * 1000);
     esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     config.start = false;

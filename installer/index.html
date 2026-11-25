@@ -3,36 +3,118 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>Momentra ESP Flasher</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <header><span class="badge">OFFLINE • LOCAL</span><h1>Momentra ESP Flasher</h1>
-    <p>Install Momentra Clock or flash your own ESP firmware. Files and serial traffic stay on this computer.</p></header>
-  <section><h2>1. Prepare and connect</h2>
-    <p>Use Chrome or Edge and a USB data cable. Close serial monitors. On Ubuntu, serial-port permissions may be required. Some boards require holding BOOT while connecting.</p>
-    <p>Momentra requires an original ESP32 with 4 MB flash and one compatible 32 × 16 monochrome P10 HUB12 panel. Check wiring and power before connecting the display.</p>
-    <button id="connect" type="button">Connect device</button> <button id="disconnect" type="button" disabled>Disconnect</button>
-    <p id="device">No device connected</p>
-  </section>
-  <section><h2>2. Choose firmware</h2>
-    <label for="mode">Firmware</label>
-    <select id="mode"><option value="momentra">Momentra Clock factory image — original ESP32</option><option value="custom">Custom ESP firmware</option></select>
-    <p id="preset-warning" class="warning"><strong>Data loss:</strong> The factory image overwrites Wi-Fi credentials, alarms and other settings, even without whole-chip erase.</p>
-    <div id="custom" hidden><p>Choose binary files and offsets from your firmware provider. Each offset must be 4096-byte aligned. Only compatible ESP8266 and ESP32-family devices with a supported flasher stub and detectable flash can be used. Incorrect files or offsets can make a device unbootable.</p>
-      <div id="files"></div><button id="add-file" type="button">Add another file</button>
+<main class="shell">
+  <header class="hero">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">M</span><span>MOMENTRA <span class="brand-light">/ ESP FLASHER</span></span></div>
+    <div class="hero-content">
+      <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> LOCAL &amp; OFFLINE</p>
+      <h1>Bring your device<br><span>to life.</span></h1>
+      <p class="hero-copy">Install Momentra Clock or flash your own ESP firmware. Your files and serial traffic stay on this computer.</p>
+      <div class="tags"><span>Windows + Ubuntu</span><span>Chrome / Edge</span><span>No cloud required</span></div>
     </div>
-    <label class="check"><input id="erase" type="checkbox"> Erase the entire flash before writing (destroys all device data)</label>
-    <p>Even without whole-chip erase, every sector touched by a selected file is erased and overwritten. Back up important data first.</p>
-    <label class="check"><input id="confirm" type="checkbox"> I understand the data-loss warning and have selected the correct device and firmware.</label>
-    <button id="flash" type="button" disabled>Review and flash</button>
+    <div class="hero-art" aria-hidden="true"><div class="clock-face"><span>12<span class="colon">:</span>34</span><small>YOUR NEXT PROJECT STARTS HERE</small></div></div>
+  </header>
+
+  <section class="card compatibility" aria-labelledby="supported-title">
+    <div class="section-heading"><span class="step-icon" aria-hidden="true">01</span><div><p class="eyebrow">KNOW YOUR DEVICE</p><h2 id="supported-title">Supported MCUs</h2></div></div>
+    <div class="support-grid">
+      <div class="support-block"><span class="pill accent">MOMENTRA PRESET</span><h3>ESP32 &amp; ESP32-S3</h3><p>Separate factory images are selected automatically. At least 4 MB flash and one compatible 32 × 16 monochrome P10 HUB12 panel are required.</p></div>
+      <div class="support-block"><span class="pill">CUSTOM FIRMWARE</span><h3>More Espressif chips</h3><p>Bundled flasher stubs cover ESP8266, ESP32, ESP32-S2, ESP32-S3, ESP32-S31, ESP32-C2, ESP32-C3, ESP32-C5, ESP32-C6, ESP32-C61, ESP32-H2, ESP32-H4 and ESP32-P4. Provide firmware built for your chip.</p><p class="muted small">A working stub and detectable flash are required. Board and chip configurations vary; not all have been tested. ESP32-H21 and ESP32-E22 have no bundled stub.</p></div>
+    </div>
   </section>
-  <section><h2>3. Status and setup</h2>
-    <p id="status" role="status" aria-live="polite">Connect a device to begin.</p>
-    <p>After installing Momentra, connect to the open <strong>Momentra Clock</strong> Wi-Fi network, visit <strong>http://192.168.4.1/</strong> and configure Wi-Fi. The setup network and dashboard are unencrypted and unauthenticated; use a trusted environment.</p>
-    <p>Keep this launcher running while using the page. Close its window or press Ctrl+C when finished.</p>
+
+  <section class="card" aria-labelledby="connect-title">
+    <div class="section-heading"><span class="step-icon" aria-hidden="true">02</span><div><p class="eyebrow">GET CONNECTED</p><h2 id="connect-title">Prepare your board</h2></div></div>
+    <p>Connect a USB <strong>data cable</strong>, close serial monitors, and use Chrome or Edge. Install the board's USB driver if needed.</p>
+    <div class="connect-bar"><div><span class="device-label">DEVICE STATUS</span><p id="device" class="device-name">No device connected</p></div><div class="actions"><button id="connect" type="button" class="primary">Connect device <span aria-hidden="true">↗</span></button><button id="disconnect" type="button" class="secondary" disabled>Disconnect</button></div></div>
+    <div class="help-grid">
+      <details class="help-block windows-guide">
+        <summary><span><strong>Windows step-by-step guide</strong><small>Download, connect, flash and set up</small></span></summary>
+        <div class="guide-content">
+          <div class="guide-columns">
+            <div>
+              <h3>Install Momentra</h3>
+              <ol class="steps">
+                <li>Download the Windows x86-64 ZIP from <a href="https://github.com/sgsudhir/Momentra-Clock/releases" target="_blank" rel="noopener noreferrer">GitHub Releases ↗</a> (opens in a new tab; a release must be published first). Right-click the ZIP, select <strong>Extract All</strong>, and open the extracted folder.</li>
+                <li>Run <strong>momentra-flasher.exe</strong> and keep its window open. The local page should open automatically; if it does not, copy the address printed in the window into Chrome or Edge.</li>
+                <li>Connect the board using a USB data cable. Close serial monitors and other apps using its port. In <strong>Device Manager → Ports (COM &amp; LPT)</strong>, note the board's COM port if listed.</li>
+                <li>Select <strong>Connect device</strong> on this page and choose the board in the browser's port chooser. Confirm the detected chip and flash size.</li>
+                <li>Choose the <strong>Momentra Clock</strong> preset; the flasher selects the image for the detected chip. Check the board and GPIO wiring, and acknowledge the data-loss warning. The factory image overwrites settings and credentials even without whole-chip erase.</li>
+                <li>Select <strong>Review and flash</strong>, verify the device and image, and confirm. Keep the USB cable connected until writing and verification complete.</li>
+                <li>After verification, release BOOT and press <strong>EN / RESET</strong> once to start normally. Then join the open <strong>Momentra Clock</strong> Wi-Fi network and open <a href="http://192.168.4.1/" target="_blank" rel="noopener noreferrer">http://192.168.4.1/ ↗</a> to configure Wi-Fi. Use a trusted environment: setup is unencrypted and unauthenticated.</li>
+              </ol>
+            </div>
+            <div>
+              <h3>If Windows cannot connect</h3>
+              <ul class="steps">
+                <li>Try another data cable or USB port. Some boards expose a native USB device or have separate USB and USB-to-UART connectors; check the board manual.</li>
+                <li>If the board is missing or has a driver warning in Device Manager, install the driver appropriate to its USB-to-serial chip from the board or chip manufacturer's official site. Common bridges include CP210x and CH340; native USB devices may use a different driver.</li>
+                <li>If the port is busy, close serial monitors and retry. If connection times out, follow the <strong>BOOT / RESET</strong> card below.</li>
+                <li>After verification, release BOOT and press EN / RESET once to start normally.</li>
+              </ul>
+              <p class="muted small">To check the download, open PowerShell in the ZIP's folder and run <code>Get-FileHash .\momentra-flasher-windows-x86_64.zip -Algorithm SHA256</code>. Compare the hash with <code>SHA256SUMS.txt</code> from the same release. Verify the source and follow your organization's security policy if Windows warns about an unfamiliar download. The launcher and firmware work offline after download; drivers may need a separate download.</p>
+            </div>
+          </div>
+        </div>
+      </details>
+      <details class="help-block">
+        <summary><span><strong>Ubuntu serial permissions</strong><small>Port access and copyable command</small></span></summary>
+        <div class="guide-content"><p>If the port is inaccessible, Ubuntu commonly uses the <code>dialout</code> group. In a terminal, run:</p>
+          <div class="code-row"><code id="linux-command">sudo usermod -aG dialout "$USER"</code><button id="copy-command" type="button" class="copy-button">Copy</button></div>
+          <p id="copy-feedback" class="copy-feedback" role="status" aria-live="polite"></p>
+          <p class="muted small">Sign out and back in, then reconnect the board. This grants your account access to serial devices. Check the device's group with <code>ls -l /dev/ttyACM0</code> or <code>ls -l /dev/ttyUSB0</code>; other Linux distributions may use a different group.</p>
+        </div>
+      </details>
+      <details class="help-block">
+        <summary><span><strong>BOOT / RESET instructions</strong><small>Manual download mode and restart</small></span></summary>
+        <div class="guide-content"><p>Most boards enter download mode automatically. If connection fails, try the manual sequence:</p>
+          <ol class="steps"><li>Press and hold <strong>BOOT</strong>.</li><li>While holding BOOT, press and release <strong>EN / RESET</strong>.</li><li>Release <strong>BOOT</strong>, then select <strong>Connect device</strong> and choose the serial port.</li><li>Choose the firmware, leave <strong>Erase the entire flash</strong> unchecked (recommended), and upload. Wait for verification to finish. The Momentra factory image still overwrites saved settings and credentials.</li><li>Press <strong>EN / RESET</strong> once to start normally. Flashing is complete.</li></ol>
+        </div>
+      </details>
+    </div>
   </section>
+
+  <div class="work-grid">
+    <section class="card" aria-labelledby="firmware-title">
+      <div class="section-heading"><span class="step-icon" aria-hidden="true">03</span><div><p class="eyebrow">CHOOSE YOUR IMAGE</p><h2 id="firmware-title">Firmware</h2></div></div>
+      <label for="mode" class="field-label">SELECT FIRMWARE</label>
+      <select id="mode"><option value="momentra">Momentra Clock — ESP32 / ESP32-S3 (auto-detected)</option><option value="custom">Custom ESP firmware</option></select>
+      <div id="preset-warning" class="notice warning"><strong>Factory installation overwrites data.</strong><p>Wi-Fi credentials, alarms and settings are overwritten even without whole-chip erase. Back up first.</p></div>
+      <div id="custom" hidden><p>Choose binary files and offsets from your firmware provider. Each offset must be 4096-byte aligned. Incorrect files or offsets can make a device unbootable.</p><div id="files"></div><button id="add-file" type="button" class="secondary">+ Add another file</button></div>
+      <label class="check"><input id="erase" type="checkbox"><span>Erase the <strong>entire flash</strong> before writing <span class="muted">(destroys all device data)</span></span></label>
+      <p class="muted small">Without whole-chip erase, every sector touched by a selected file is still erased and overwritten.</p>
+      <label class="check"><input id="confirm" type="checkbox"><span>I understand the data-loss warning and have selected the correct device and firmware.</span></label>
+      <button id="flash" type="button" class="primary flash-button" disabled>Review and flash <span aria-hidden="true">→</span></button>
+    </section>
+    <section class="card setup-card" aria-labelledby="setup-title">
+      <div class="section-heading"><span class="step-icon" aria-hidden="true">04</span><div><p class="eyebrow">THE FINAL STEP</p><h2 id="setup-title">Status &amp; setup</h2></div></div>
+      <p class="field-label">FLASHER STATUS</p><p id="status" class="status-box" role="status" aria-live="polite">Connect a device to begin.</p>
+      <div class="setup-steps"><div><span>1</span><p>After flashing Momentra, connect to the open <strong>Momentra Clock</strong> Wi-Fi network.</p></div><div><span>2</span><p>Open <a href="http://192.168.4.1/" target="_blank" rel="noopener noreferrer">http://192.168.4.1/ ↗</a> and configure Wi-Fi.</p></div><div><span>3</span><p>Reconnect to your usual network after setup. Keep the launcher running while using this page.</p></div></div>
+      <div class="notice security"><strong>Use a trusted environment.</strong><p>The setup network and dashboard are unauthenticated and unencrypted.</p></div>
+    </section>
+  </div>
+
+  <section class="card pinout" aria-labelledby="pins-title">
+    <div class="section-heading"><span class="step-icon" aria-hidden="true">05</span><div><p class="eyebrow">BEFORE WIRING</p><h2 id="pins-title">Factory firmware pinouts</h2></div></div>
+    <p>GPIO numbers are chip labels, not physical header positions. Original ESP32 header positions below are for the Espressif ESP32-DevKitC V4; other boards and revisions may differ. Check the exact board and panel before powering or wiring.</p>
+    <div class="table-wrap"><table><thead><tr><th scope="col">SIGNAL</th><th scope="col">ORIGINAL ESP32 / DEVKITC V4</th><th scope="col">ESP32-S3 DEVKITC-1 N16R8</th></tr></thead><tbody>
+      <tr><th scope="row">P10 DATA</th><td>GPIO 23 / IO23 (J3-2)</td><td>GPIO 4</td></tr>
+      <tr><th scope="row">P10 CLK</th><td>GPIO 18 / IO18 (J3-9)</td><td>GPIO 5</td></tr>
+      <tr><th scope="row">P10 LATCH / STB</th><td>GPIO 19 / IO19 (J3-8)</td><td>GPIO 6</td></tr>
+      <tr><th scope="row">P10 OE</th><td>GPIO 21 / IO21 (J3-6)</td><td>GPIO 7</td></tr>
+      <tr><th scope="row">P10 A</th><td>GPIO 22 / IO22 (J3-3)</td><td>GPIO 15</td></tr>
+      <tr><th scope="row">P10 B</th><td>GPIO 25 / IO25 (J2-9)</td><td>GPIO 16</td></tr>
+      <tr><th scope="row">Buzzer driver input</th><td>GPIO 26 / IO26 (J2-10)</td><td>GPIO 17</td></tr>
+      <tr><th scope="row">Common ground</th><td>GND (J3-1, J3-7 or J2-14)</td><td>GND (J1-22)</td></tr>
+    </tbody></table></div>
+    <p class="muted small">Use a suitable external buzzer driver, common ground, a correctly rated panel supply and level shifting where needed. Never power a panel or buzzer directly from a GPIO. The S3 mapping and display still need panel testing.</p>
+  </section>
+  <footer><span>MOMENTRA <span class="brand-light">/ ESP FLASHER</span></span><span>Local by design · Close the launcher or press Ctrl+C when finished</span></footer>
 </main>
 <script type="module" src="app.js"></script>
 </body>

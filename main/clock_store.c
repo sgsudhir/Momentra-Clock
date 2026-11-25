@@ -23,6 +23,16 @@ static esp_err_t read_optional_u8(nvs_handle_t handle, const char *key, uint8_t 
     return err == ESP_ERR_NVS_NOT_FOUND ? ESP_OK : err;
 }
 
+static esp_err_t read_optional_timezone(nvs_handle_t handle, const char *key, char *value)
+{
+    char name[CLOCK_TIMEZONE_NAME_SIZE] = {0};
+    size_t size = sizeof(name);
+    esp_err_t err = nvs_get_str(handle, key, name, &size);
+    if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
+    if (err == ESP_OK) memcpy(value, name, sizeof(name));
+    return err;
+}
+
 /* This prefix is the exact historical config_v1 blob layout. New options use
  * separate NVS keys so existing devices can retain their saved settings. */
 typedef struct {
@@ -75,6 +85,9 @@ esp_err_t clock_store_init(void)
     }
     if (err == ESP_OK) err = read_optional_u8(handle, "colon_blink", &current.colon_blink);
     if (err == ESP_OK) err = read_optional_u8(handle, "seconds_anim", &current.seconds_animation);
+    if (err == ESP_OK) err = read_optional_timezone(handle, "tz_primary", current.timezone_primary);
+    if (err == ESP_OK) err = read_optional_timezone(handle, "tz_secondary", current.timezone_secondary);
+    if (err == ESP_OK) err = read_optional_u8(handle, "tz2_enabled", &current.timezone_secondary_enabled);
     nvs_close(handle);
     if (err != ESP_OK) {
         return err;
@@ -107,6 +120,9 @@ static esp_err_t commit_update(const clock_config_t *old, const clock_config_t *
         }
         if (err == ESP_OK) err = nvs_set_u8(handle, "colon_blink", config->colon_blink);
         if (err == ESP_OK) err = nvs_set_u8(handle, "seconds_anim", config->seconds_animation);
+        if (err == ESP_OK) err = nvs_set_str(handle, "tz_primary", config->timezone_primary);
+        if (err == ESP_OK) err = nvs_set_str(handle, "tz_secondary", config->timezone_secondary);
+        if (err == ESP_OK) err = nvs_set_u8(handle, "tz2_enabled", config->timezone_secondary_enabled);
         if (err == ESP_OK) {
             err = nvs_commit(handle);
         }
@@ -163,6 +179,10 @@ esp_err_t clock_store_claim_alarms(const clock_config_t *expected, uint8_t candi
     clock_config_t old;
     clock_store_get(&old);
     clock_config_t updated = old;
+    if (strcmp(old.timezone_primary, expected->timezone_primary) != 0) {
+        xSemaphoreGive(write_lock);
+        return ESP_OK;
+    }
     uint8_t matching = 0;
     unsigned duration = 0;
     /* Recheck enabled/time against current settings before claiming. Persist

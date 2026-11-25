@@ -17,6 +17,7 @@ stable APIs.
 | [`main/web/index.html`](../main/web/index.html) | Embedded HTML, CSS and JavaScript dashboard |
 | [`main/Kconfig.projbuild`](../main/Kconfig.projbuild) | Panel and buzzer build options |
 | [`sdkconfig.defaults`](../sdkconfig.defaults) | Project configuration defaults |
+| [`sdkconfig.defaults.esp32s3`](../sdkconfig.defaults.esp32s3) | ESP32-S3-DevKitC-1 N16R8 GPIO defaults |
 | [`partitions.csv`](../partitions.csv) | Flash partition layout |
 | [`main/idf_component.yml`](../main/idf_component.yml) | Managed mDNS component dependency |
 | [`tests/`](../tests/) | Host tests and NVS stubs |
@@ -53,7 +54,7 @@ the headers.
 
 | Function | Responsibility |
 | --- | --- |
-| [`clock_time_init`](../main/clock_time.h) | Sets the fixed local timezone and initializes SNTP without starting it. |
+| [`clock_time_init`](../main/clock_time.h) | Initializes SNTP without starting it. |
 | [`clock_time_start_sync`](../main/clock_time.h) | Starts SNTP after station connection. |
 | [`clock_time_snapshot`](../main/clock_time.h) | Returns validity, sync age and wall time when valid. |
 | [`clock_sync_is_fresh`](../main/clock_freshness.h) | Tests a monotonic last-sync timestamp against the exclusive 12-hour limit. |
@@ -61,9 +62,13 @@ the headers.
 | [`clock_schedule_check`](../main/clock_schedule.h) | Calculates current-minute alarm and hourly events when time is valid. |
 
 The SNTP callback records the last successful synchronization timestamp.
-Time-zone setup uses POSIX `IST-5:30`, whose sign convention represents
-UTC+05:30. Schedule logic independently applies the same fixed offset; a
-future timezone change must update both paths and their tests.
+Display and schedule conversion use [`clock_timezone.c`](../main/clock_timezone.c),
+without changing process-global `TZ`. [`clock_timezone_data.inc`](../main/clock_timezone_data.inc)
+is generated from the public-domain IANA tzdb (currently 2026f); regenerate
+with `node tools/generate-timezones.mjs` on a system with the desired tzdb and
+`zdump`, then rebuild and retest. Rules cover 1970–2100; offsets outside this
+range are rejected. Timezone names and the second-line switch are saved as
+separate NVS keys to preserve the legacy configuration blob.
 
 ### Network and HTTP
 
@@ -135,24 +140,27 @@ can leave persistence uncertain. Do not log or return Wi-Fi credentials.
 
 ## Host tests
 
+The firmware version is defined in [`clock_version.h`](../main/clock_version.h).
+The ESP-IDF image metadata, status API and dashboard all use this value.
+
 Run these from the repository root with a C compiler and Node.js. The tests
 exercise pure logic, persistence with host stubs, status serialization and
 timer behavior; they do not simulate actual Wi-Fi, flash, panel or OTA.
 
 ```sh
 cc -std=c11 -Wall -Wextra -Werror -I main \
-  main/clock_config.c main/clock_schedule.c main/clock_freshness.c \
+  main/clock_config.c main/clock_timezone.c main/clock_schedule.c main/clock_freshness.c \
   main/clock_render.c main/clock_scan.c main/clock_form.c main/clock_sound.c \
   tests/test_clock_logic.c -o /tmp/esp-p10-clock-logic-test
 /tmp/esp-p10-clock-logic-test
 
 cc -std=c11 -Wall -Wextra -Werror -pthread -I tests/stubs -I main \
-  main/clock_config.c main/clock_store.c tests/test_clock_store.c \
+  main/clock_config.c main/clock_timezone.c main/clock_store.c tests/test_clock_store.c \
   -o /tmp/esp-p10-clock-store-test
 /tmp/esp-p10-clock-store-test
 
 cc -std=c11 -Wall -Wextra -Werror -I main \
-  main/clock_config.c main/clock_status.c tests/test_clock_status.c \
+  main/clock_config.c main/clock_timezone.c main/clock_status.c tests/test_clock_status.c \
   -o /tmp/esp-p10-clock-status-test
 /tmp/esp-p10-clock-status-test | node tests/test_status_json.js
 
@@ -160,6 +168,19 @@ cc -std=c11 -Wall -Wextra -Werror -I main \
   main/clock_timer_logic.c tests/test_clock_timers.c -o /tmp/esp-p10-clock-timers-test
 /tmp/esp-p10-clock-timers-test
 
+cc -std=c11 -Wall -Wextra -Werror -I main \
+  main/clock_config.c main/clock_timezone.c main/clock_schedule.c tests/test_clock_timezone.c \
+  -o /tmp/esp-p10-clock-timezone-test
+/tmp/esp-p10-clock-timezone-test
+
+cc -std=c11 -Wall -Wextra -Werror -DCONFIG_IDF_TARGET_ESP32=1 \
+  -I tests/stubs -I main tests/test_clock_pins.c -o /tmp/clock-pins-esp32
+/tmp/clock-pins-esp32
+cc -std=c11 -Wall -Wextra -Werror -DCONFIG_IDF_TARGET_ESP32S3=1 \
+  -I tests/stubs -I main tests/test_clock_pins.c -o /tmp/clock-pins-s3
+/tmp/clock-pins-s3
+
+node tests/test_dashboard.mjs
 node tests/test_installer.mjs
 ```
 

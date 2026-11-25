@@ -310,6 +310,29 @@ static void centered_text(clock_frame_t *frame, const char *text, unsigned y)
     for (size_t i = 0; i < count; ++i) small_character(frame, text[i], x + i * 6, y);
 }
 
+void clock_render_dual(clock_frame_t *frame, bool valid, unsigned first_hour,
+                       unsigned first_minute, unsigned second_hour, unsigned second_minute,
+                       bool blink, unsigned second)
+{
+    if (!valid || first_hour > 23 || first_minute > 59 ||
+        second_hour > 23 || second_minute > 59 || second >= 60) {
+        clock_render_connection(frame, CLOCK_CONNECTION_DONE, false, 0, 0);
+        return;
+    }
+
+    const unsigned hours[] = {first_hour, second_hour};
+    const unsigned minutes[] = {first_minute, second_minute};
+    memset(frame, 0, sizeof(*frame));
+    for (unsigned row = 0; row < 2; ++row) {
+        clock_frame_t line;
+        int separator = clock_render(&line, true, hours[row], minutes[row], false, 7);
+        clock_render_seconds(&line, second, 0, blink, CLOCK_SECONDS_NONE, 7, separator);
+        for (unsigned y = 0; y < 7; ++y) {
+            memcpy(frame->rows[row * 8 + y], line.rows[y + 4], sizeof(frame->rows[0]));
+        }
+    }
+}
+
 clock_connection_phase_t clock_connection_phase(bool connected, int64_t connected_at_us,
                                                int64_t now_us)
 {

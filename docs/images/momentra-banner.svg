@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" role="img" aria-labelledby="title description">
+  <title id="title">Momentra Clock</title>
+  <desc id="description">Concept illustration of a glowing digital clock and a monochrome pixel display.</desc>
+  <defs>
+    <clipPath id="frame"><rect width="1200" height="300" rx="26"/></clipPath>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#081326"/>
+      <stop offset="1" stop-color="#17463e"/>
+    </linearGradient>
+    <linearGradient id="accent" x2="1" y2="0">
+      <stop stop-color="#8ef0ce"/>
+      <stop offset="1" stop-color="#64c8f2"/>
+    </linearGradient>
+    <pattern id="pixels" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="6" cy="6" r="2" fill="#46675f" opacity=".48"/>
+    </pattern>
+  </defs>
+  <g clip-path="url(#frame)">
+  <rect width="1200" height="300" rx="26" fill="url(#background)"/>
+  <circle cx="1010" cy="10" r="165" fill="#7beac2" opacity=".07"/>
+  <circle cx="620" cy="295" r="110" fill="#73bfff" opacity=".06"/>
+  <text x="64" y="95" fill="#9cf2d4" font-family="Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="4">YOUR TIME. YOUR SPACE.</text>
+  <text x="64" y="160" fill="#f3fff9" font-family="Arial, sans-serif" font-size="58" font-weight="700">Momentra Clock</text>
+  <text x="66" y="207" fill="#bdd8d5" font-family="Arial, sans-serif" font-size="22">A little light for every moment.</text>
+  <rect x="66" y="231" width="234" height="5" rx="2.5" fill="url(#accent)"/>
+  <rect x="746" y="51" width="392" height="198" rx="20" fill="#06151d" stroke="#48766b" stroke-width="2"/>
+  <rect x="762" y="67" width="360" height="166" rx="10" fill="url(#pixels)"/>
+  <text x="942" y="175" text-anchor="middle" fill="#b9ffe6" font-family="monospace" font-size="83" font-weight="700" letter-spacing="-5">12:34</text>
+  <text x="942" y="215" text-anchor="middle" fill="#78a79b" font-family="Arial, sans-serif" font-size="12" letter-spacing="3">DISPLAY CONCEPT</text>
+  </g>
+</svg>

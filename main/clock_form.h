@@ -5,7 +5,7 @@
 
 /** Decoded, NUL-terminated form field with fixed storage limits. */
 typedef struct {
-    char name[24];
+    char name[32];
     char value[128];
 } clock_form_field_t;
 

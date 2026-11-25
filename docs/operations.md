@@ -26,7 +26,7 @@
 | Panel shows `WiFi` | The station is disconnected. Verify network and reconnect; setup AP alone is not a station connection. |
 | Panel shows `SYNC` | Check DNS and NTP access to `pool.ntp.org`, then inspect time validity and sync age. At 12 hours without a successful sync, time becomes stale. |
 | Blank or garbled panel | Check power, common ground, enable state, brightness, physical connector mapping, scan order, DATA/OE polarity and logic levels. `display_ready` does not confirm the panel is wired correctly. |
-| Flicker | Check supply under load and signal integrity, then test brightness, Wi-Fi, HTTP and flash load separately. Core affinity and frame boundaries reduce contention but do not guarantee timing; OTA intentionally blanks the panel. |
+| Flicker | Check supply under load and signal integrity, then test brightness, Wi-Fi, HTTP and flash load separately. A core-1 hardware-timer wakeup and frame boundaries reduce timing variation but do not guarantee flicker-free operation; OTA intentionally blanks the panel. |
 | Alarm does not sound | Check enabled slot, 24-hour local schedule, valid time, configured and physically working buzzer, missed-minute behavior and serial NVS errors. A one-shot may already be disabled. |
 | Reminder unavailable | A buzzer must be configured; start only from stopped state with 1–86400 seconds. |
 | API returns 400/409 | Check [field ranges and transitions](api.md); refresh status after a conflict and retry only if appropriate. |

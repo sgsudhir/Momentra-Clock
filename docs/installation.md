@@ -22,8 +22,8 @@ browser assets and Momentra image work offline. The launcher serves only
 explicit serial-port permission. Chrome or Edge on Windows or Ubuntu is
 required; opening a local HTML file directly does not work.
 
-1. Read the [hardware guide](hardware.md). The factory image enables panel
-   GPIOs and GPIO26 buzzer output; use safe, correctly wired hardware. Use
+1. Read the [hardware guide](hardware.md). Each factory image enables panel
+   GPIOs and a target-specific buzzer output; use safe, correctly wired hardware. Use
    **one** 32 × 16 monochrome P10 HUB12 panel with 1/4 scan and matching
    polarity and scan order; white, red, green, blue, yellow and pink are
    possible fixed-color variants, subject to hardware verification. RGB and
@@ -37,22 +37,41 @@ required; opening a local HTML file directly does not work.
    `chmod +x ./momentra-flasher` first. The launcher opens the default browser;
    if it is not Chrome or Edge, copy the printed local URL into one of them.
 4. Select **Connect device** and choose the serial port. Check that the
-   detected chip is an original ESP32 with at least 4 MB flash. Select the
+   detected chip is ESP32 or ESP32-S3 with at least 4 MB flash. Select the
    Momentra preset, read the warnings, check the confirmation box, and select
-   **Review and flash**. Confirm the displayed image and device. The factory
+   **Review and flash**. The installer chooses the image for the detected
+   chip. Verify that the board matches its target-specific GPIO mapping.
+   Confirm the displayed image and device. The factory
    image **always overwrites NVS**, even when whole-device erase is unchecked.
    Existing credentials, settings and the previous partition layout can be
    lost; back up first. Wait for verification and reset.
-5. Press EN/RESET if needed. Follow the installer's on-screen instructions to
+5. After verification, release BOOT and press EN/RESET once to start normally.
+   Follow the installer's on-screen instructions to
    connect to the open **Momentra Clock** AP and configure station Wi-Fi.
    The AP is unauthenticated and unencrypted; provision only in a trusted
    environment. Older installed firmware uses `P10-Clock-Setup` until updated.
 
 Close the launcher window or press Ctrl+C when finished. On Ubuntu, serial
 device permissions may need to be granted for the USB
-adapter and the user may need to sign in again. Some boards require holding
-BOOT while resetting to enter download mode. Check the board manual. Browser
-port selection is explicit. Momentra only supports the original ESP32;
+adapter and the user may need to sign in again. On Ubuntu, if the device uses
+the `dialout` group, the installer provides a copy button for
+`sudo usermod -aG dialout "$USER"`. This grants the account access to serial
+devices; sign out and back in afterward. Check the device's actual group,
+which can differ by Linux distribution.
+
+On Windows, the flasher page includes an expandable step-by-step guide. If
+the board does not appear, use Device Manager to inspect its COM port or
+driver, try a data-capable cable, and install only the driver appropriate
+to the board's USB interface from the manufacturer's official source. Close
+other serial applications before connecting.
+
+Most boards enter download mode automatically. If connection fails, hold
+BOOT, press and release EN/RESET, then release BOOT. Select **Connect device**
+and choose the port. After upload and verification, release BOOT and press
+EN/RESET once to start the installed firmware normally; the flasher may also
+reset the device automatically. Check the board manual for its button sequence.
+Browser
+port selection is explicit. Momentra presets support ESP32 and ESP32-S3;
 custom mode supports ESP8266 and ESP32-family chips implemented by the
 bundled `esptool-js` version with a working flasher stub and detectable flash,
 not all boards or chip configurations.
@@ -82,21 +101,24 @@ tested toolchain and production configuration, follow steps
 [3](#3-install-and-configure-esp-idf) and [4](#4-initial-flash) below. In an
 ESP-IDF terminal on Windows, use the same `idf.py` actions and a Windows
 path for `SDKCONFIG`, for example `-D SDKCONFIG=C:/momentra/build/production/sdkconfig`,
-and replace `/dev/ttyUSB0` with the board's `COM` port. Select **ESP32**, not
-S2/S3/C3. Rebuild after changing source, settings or the embedded dashboard.
+and replace `/dev/ttyUSB0` with the board's `COM` port. Select the matching
+**ESP32** or **ESP32-S3** target; S2/C3 are not supported. Use separate build
+and sdkconfig directories for the two targets. Rebuild after changing source,
+settings or the embedded dashboard.
 
 Use the serial `flash` action for the first install or a deliberate partition
 migration; it writes the bootloader, partition table, OTA data and application.
 Back up device data before changing layouts. For a compatible existing layout,
 the dashboard's **Device maintenance** accepts only the generated application
-binary (`build/production/ESP_P10_Clock_BLR.bin`) as an OTA update, not the
-merged factory image. Confirm active alarms and timers and follow
+binary for the same chip target (`build/production/ESP_P10_Clock_BLR.bin`
+for ESP32 or `build/production-s3/ESP_P10_Clock_BLR.bin` for ESP32-S3) as
+an OTA update, not the merged factory image. Confirm active alarms and timers and follow
 [update and recovery](operations.md#firmware-update-and-recovery).
 
 ## Build and publish portable packages
 
 The [`release.yml`](../.github/workflows/release.yml) workflow builds the
-ESP-IDF 6.1 factory image, browser bundle, and Windows and Ubuntu x86-64
+ESP-IDF 6.1 factory images for both targets, browser bundle, and Windows and Ubuntu x86-64
 launchers. Pushes to `main` and manual workflow dispatch create an Actions
 artifact without publishing a release. Pushing a `v*` tag triggers the build
 and, if it succeeds, creates a GitHub Release with both archives and
@@ -125,8 +147,16 @@ esptool --chip esp32 merge-bin --flash-mode dio --flash-size 4MB --flash-freq 40
   0x8000 build/production/partition_table/partition-table.bin \
   0xf000 build/production/ota_data_initial.bin \
   0x20000 build/production/ESP_P10_Clock_BLR.bin
+idf.py -B build/production-s3 -D SDKCONFIG="$PWD/build/production-s3/sdkconfig" \
+  -D IDF_TARGET=esp32s3 build
+esptool --chip esp32s3 merge-bin --flash-mode dio --flash-size 4MB --flash-freq 80m \
+  -o build/release/momentra-s3-factory.bin \
+  0x0 build/production-s3/bootloader/bootloader.bin \
+  0x8000 build/production-s3/partition_table/partition-table.bin \
+  0xf000 build/production-s3/ota_data_initial.bin \
+  0x20000 build/production-s3/ESP_P10_Clock_BLR.bin
 npm ci --prefix installer
-sh installer/prepare-site.sh build/release/momentra-factory.bin
+sh installer/prepare-site.sh build/release/momentra-factory.bin build/release/momentra-s3-factory.bin
 (cd installer/launcher && go test ./... && go build -o momentra-flasher .)
 ```
 
@@ -137,7 +167,7 @@ the expected production layout.
 
 ## 1. Prepare the equipment
 
-- ESP32-WROOM-32 with **4 MB flash**, programming interface and suitable 3.3 V
+- Original ESP32 or ESP32-S3 with **at least 4 MB flash**, programming interface and suitable 3.3 V
   regulation; **one** 32 × 16 monochrome P10 HUB12 panel with 1/4 scan and
   matching scan order and polarity. White, red, green, blue, yellow or pink
   single-color panels are possible; verify the exact panel before use.
@@ -160,21 +190,21 @@ the expected production layout.
 
 ## 2. Wire by signal name
 
-These are default **ESP32 GPIO numbers**, not physical connector positions.
+These are default **chip GPIO numbers**, not physical connector positions.
 Refer to the panel and module documentation for actual pin locations.
 
-| Signal | GPIO | Role |
-| --- | ---: | --- |
-| DATA | 23 | SPI data |
-| CLK | 18 | SPI clock |
-| LATCH / STB | 19 | Shift-register latch |
-| OE | 21 | Output enable and brightness PWM |
-| A | 22 | Row-address bit 0 |
-| B | 25 | Row-address bit 1 |
-| Buzzer driver input | 26 | Active-high control of external driver |
+| Signal | ESP32 GPIO | ESP32-S3 GPIO | Role |
+| --- | ---: | ---: | --- |
+| DATA | 23 | 4 | SPI data |
+| CLK | 18 | 5 | SPI clock |
+| LATCH / STB | 19 | 6 | Shift-register latch |
+| OE | 21 | 7 | Output enable and brightness PWM |
+| A | 22 | 15 | Row-address bit 0 |
+| B | 25 | 16 | Row-address bit 1 |
+| Buzzer driver input | 26 | 17 | Active-high control of external driver |
 
 ```text
- ESP32                  Panel / driver
+ Original ESP32         Panel / driver
  GPIO23  -------------> DATA
  GPIO18  -------------> CLK
  GPIO19  -------------> LATCH
@@ -186,6 +216,9 @@ Refer to the panel and module documentation for actual pin locations.
 
  Correctly rated panel supply ---> panel power inputs
 ```
+
+For S3 wiring substitute the S3 GPIOs from the table. The S3 mapping is
+for an ESP32-S3-DevKitC-1 N16R8 and has not been physically verified.
 
 Add level shifting where needed; the diagram omits it and is not a complete
 circuit. The current driver assumes active-low DATA, active-high OE, binary
@@ -216,6 +249,17 @@ build.
 idf.py -B build/production -D SDKCONFIG="$PWD/build/production/sdkconfig" set-target esp32
 idf.py -B build/production -D SDKCONFIG="$PWD/build/production/sdkconfig" menuconfig
 ```
+
+For ESP32-S3, use a separate build directory and target:
+
+```sh
+idf.py -B build/production-s3 -D SDKCONFIG="$PWD/build/production-s3/sdkconfig" set-target esp32s3
+idf.py -B build/production-s3 -D SDKCONFIG="$PWD/build/production-s3/sdkconfig" menuconfig
+```
+
+In the following build and flash commands, replace `build/production` with
+`build/production-s3` for the S3. Target-specific defaults are read when a
+new configuration is created; inspect existing configurations explicitly.
 
 In **P10 clock hardware**, verify panel enable, pin assignments, DATA and OE
 polarity against the real hardware. Set buzzer GPIO to `-1` if no buzzer is

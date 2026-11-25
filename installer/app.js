@@ -65,7 +65,7 @@ $("connect").addEventListener("click", async () => {
     const port = await navigator.serial.requestPort();
     transport = new Transport(port);
     loader = new ESPLoader({transport, baudrate: 115200});
-    status("Connecting to the bootloader; hold BOOT if required...");
+    status("Connecting to the bootloader; see BOOT / RESET instructions if needed...");
     await loader.main();
     chip = loader.chip.CHIP_NAME;
     const size = await loader.detectFlashSize();
@@ -107,10 +107,10 @@ $("flash").addEventListener("click", async () => {
     const preset = $("mode").value === "momentra";
     let images;
     if (preset) {
-      validatePreset(chip, flashBytes);
-      const response = await fetch("firmware/momentra-factory.bin");
+      const name = validatePreset(chip, flashBytes);
+      const response = await fetch(`firmware/${name}`);
       if (!response.ok) throw new Error(`Bundled Momentra image unavailable (HTTP ${response.status}).`);
-      images = [{name: "momentra-factory.bin", address: 0, data: new Uint8Array(await response.arrayBuffer())}];
+      images = [{name, address: 0, data: new Uint8Array(await response.arrayBuffer())}];
     } else {
       const rows = [...$("files").children];
       images = await Promise.all(rows.map(async row => {
@@ -124,7 +124,8 @@ $("flash").addEventListener("click", async () => {
     const eraseAll = $("erase").checked;
     if (!loader.IS_STUB) throw new Error("Flashing requires a supported flasher stub; this device did not start one.");
     const summary = images.map(image => `${image.name} at 0x${image.address.toString(16)} (${image.data.length} bytes)`).join("\n");
-    const warning = preset ? "The Momentra factory image overwrites saved Wi-Fi credentials and settings." :
+    const warning = preset ? "The Momentra factory image overwrites saved Wi-Fi credentials and settings." +
+      (chip === "ESP32-S3" ? "\nS3 outputs: DATA 4, CLK 5, LATCH 6, OE 7, A 15, B 16, buzzer 17. Check the board and wiring." : "") :
       "The selected flash sectors will be erased and overwritten. Wrong files or offsets can make the device unbootable.";
     if (!window.confirm(`${chip}, ${flashBytes} bytes flash\n\n${summary}\n\n${warning}\n${eraseAll ? "ALL FLASH WILL BE ERASED.\n" : ""}\nContinue?`)) {
       status("Flash cancelled; no data was written.");
@@ -157,6 +158,18 @@ $("flash").addEventListener("click", async () => {
 $("add-file").addEventListener("click", addRow);
 $("mode").addEventListener("change", update);
 $("confirm").addEventListener("change", update);
+$("copy-command").addEventListener("click", async () => {
+  const feedback = $("copy-feedback");
+  try {
+    if (!navigator.clipboard) throw new Error("Clipboard access is unavailable.");
+    await navigator.clipboard.writeText($("linux-command").textContent);
+    feedback.textContent = "Copied. Paste into your Ubuntu terminal.";
+    feedback.classList.toggle("error", false);
+  } catch (error) {
+    feedback.textContent = `Copy failed: ${error.message} Select and copy the command manually.`;
+    feedback.classList.toggle("error", true);
+  }
+});
 addRow();
 if (!("serial" in navigator)) status("Web Serial is unavailable. Open this local address in Chrome or Edge on Windows or Ubuntu.", true);
 update();

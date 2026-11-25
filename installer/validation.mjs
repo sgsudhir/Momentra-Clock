@@ -34,7 +34,8 @@ export function validateImages(images, flashBytes) {
 }
 
 export function validatePreset(chip, flashBytes) {
-  if (chip !== "ESP32" || flashBytes < 4 * 1024 * 1024) {
-    throw new Error("Momentra requires an original ESP32 with at least 4 MB flash. Use custom mode for other chips.");
-  }
+  if (flashBytes < 4 * 1024 * 1024) throw new Error("Momentra requires at least 4 MB flash.");
+  if (chip === "ESP32") return "momentra-factory.bin";
+  if (chip === "ESP32-S3") return "momentra-s3-factory.bin";
+  throw new Error("Momentra supports only ESP32 and ESP32-S3. Use custom mode for other chips.");
 }

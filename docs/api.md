@@ -23,7 +23,7 @@ compatibility guarantee is provided.
 Successful POST responses are `{"ok":true}`. Errors normally have the form
 `{"error":"description"}`. Actual network interruptions or HTTP-server
 failures need not return JSON. Form bodies must be 1–1024 bytes with at most
-10 fields; names and values are limited to 23 and 127 decoded bytes
+10 fields; names and values are limited to 31 and 127 decoded bytes
 respectively. Duplicate names, invalid percent escapes, embedded NULs,
 unexpected fields and missing required fields are rejected. Numeric inputs
 must parse as complete decimal values in their allowed range.
@@ -46,7 +46,8 @@ state-changing operations blindly.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/status` | Read current settings and telemetry |
-| POST | `/api/settings` | Save display and sound settings |
+| POST | `/api/settings` | Save display, sound and optional primary timezone settings |
+| GET / POST | `/api/timezones` | List named timezones / save second timezone settings |
 | POST | `/api/alarm` | Save one alarm slot |
 | POST | `/api/alarm/stop` | Request stop of scheduled sound |
 | POST | `/api/timer` | Control stopwatch or reminder |
@@ -62,6 +63,7 @@ The response is marked `Cache-Control: no-store`. Boolean telemetry is JSON
 
 | Field | Type and meaning |
 | --- | --- |
+| `firmware_version` | Firmware semantic version string, also shown in the dashboard footer. |
 | `uptime_seconds` | Integer monotonic seconds since boot. |
 | `free_heap_bytes`, `min_free_heap_bytes` | Current and minimum free heap in bytes since boot. |
 | `wifi_connected`, `setup_ap` | Boolean station connection and setup AP state. |
@@ -77,7 +79,11 @@ The response is marked `Cache-Control: no-store`. Boolean telemetry is JSON
 | `stopwatch_state`, `reminder_state` | `0` stopped, `1` running, `2` paused, `3` ringing (reminder only). |
 | `stopwatch_ms`, `reminder_ms` | Elapsed and remaining milliseconds. Reminder values are rounded up from microseconds. |
 | `brightness`, `font`, `format_12h`, `hourly_enabled`, `hourly_pattern`, `feedback_enabled`, `colon_blink`, `seconds_animation` | Persisted values, described under settings below. |
+| `timezone_primary`, `timezone_secondary` | Saved IANA timezone names. |
+| `timezone_secondary_enabled` | Numeric 0/1, whether the panel shows two rows. |
+| `timezone_primary_offset`, `timezone_secondary_offset` | Current seconds east of UTC, or `null` when time or bundled timezone rules are unavailable. |
 | `alarms` | Exactly five objects in slot order, each with numeric `enabled`, `hour`, `minute`, `repeat`, `duration_seconds`. |
+| `alarm_next_seconds` | Five estimated seconds to the next matching local alarm time, or `null` for disabled alarms or unavailable time. Scheduling state, time corrections and DST rollbacks can alter the actual next sound. |
 
 Credentials are not returned. MAC-derived identifiers are exposed to any
 client with API access. Values come from individually collected snapshots, so
@@ -91,7 +97,7 @@ Illustrative response (identifiers and values are examples):
 
 ```json
 {
-  "uptime_seconds": 42, "free_heap_bytes": 100000, "min_free_heap_bytes": 90000,
+  "firmware_version": "1.0.0", "uptime_seconds": 42, "free_heap_bytes": 100000, "min_free_heap_bytes": 90000,
   "wifi_connected": true, "setup_ap": false, "wifi_rssi": -67,
   "local_ip": "192.168.1.50", "chip_id": "0123456789AB",
   "wifi_mac": "01:23:45:67:89:AB", "time_valid": true,
@@ -100,13 +106,15 @@ Illustrative response (identifiers and values are examples):
   "stopwatch_state": 0, "stopwatch_ms": 0, "reminder_state": 0, "reminder_ms": 0,
   "brightness": 50, "font": 0, "format_12h": 0, "hourly_enabled": 0,
   "hourly_pattern": 0, "feedback_enabled": 1, "colon_blink": 0, "seconds_animation": 0,
+  "timezone_primary": "Asia/Kolkata", "timezone_secondary": "Etc/UTC",
+  "timezone_secondary_enabled": 0, "timezone_primary_offset": 19800, "timezone_secondary_offset": 0,
   "alarms": [
     {"enabled": 0, "hour": 0, "minute": 0, "repeat": 0, "duration_seconds": 10},
     {"enabled": 0, "hour": 0, "minute": 0, "repeat": 0, "duration_seconds": 10},
     {"enabled": 0, "hour": 0, "minute": 0, "repeat": 0, "duration_seconds": 10},
     {"enabled": 0, "hour": 0, "minute": 0, "repeat": 0, "duration_seconds": 10},
     {"enabled": 0, "hour": 0, "minute": 0, "repeat": 0, "duration_seconds": 10}
-  ]
+  ], "alarm_next_seconds": [null, null, null, null, null]
 }
 ```
 
@@ -119,12 +127,13 @@ current values. Changes persist across reboot after a successful commit.
 | --- | --- |
 | `brightness` | 0–100 percent |
 | `font` | 0–14; see table below |
-| `format_12h` | 0 = 24-hour, 1 = 12-hour; panel has no AM/PM indicator |
+| `format_12h` | Saved single-zone preference: 0 = 24-hour, 1 = 12-hour; two-zone mode always displays 24-hour time. The panel has no AM/PM indicator. |
 | `hourly_enabled` | 0 = off, 1 = on |
 | `hourly_pattern` | 0–3; the patterns differ in beep rhythm, not pitch |
 | `feedback_enabled` | Optional 0/1; action feedback |
 | `colon_blink` | Optional 0/1 |
 | `seconds_animation` | Optional: 0 off, 1 moving dot, 2 progress bar, 3 bouncing ball, 4 jumping ball |
+| `timezone_primary` | Optional IANA name from `GET /api/timezones`; alarms and hourly chimes use this zone |
 
 | Font ID | Dashboard label | Font ID | Dashboard label |
 | ---: | --- | ---: | --- |
@@ -137,12 +146,27 @@ current values. Changes persist across reboot after a successful commit.
 | 14 | Rounded compact | | |
 
 Animations are suppressed for fonts 5, 6, 8, 11 and 13 because of height.
+When the second timezone is enabled, both rows use 24-hour 5×7 digits.
+Animation is suppressed without changing the saved time format, font or animation.
 The dashboard maps stored legacy IDs 2–4 to Style 1 on editing. Older firmware
 may reject newer font IDs; choose Style 1 or 2 before a downgrade.
 
 ```sh
 curl -fsS -X POST http://192.168.1.50/api/settings \
-  -d 'brightness=80&font=7&format_12h=0&hourly_enabled=1&hourly_pattern=1&feedback_enabled=1&colon_blink=1&seconds_animation=3'
+  -d 'brightness=80&font=7&format_12h=0&hourly_enabled=1&hourly_pattern=1&feedback_enabled=1&colon_blink=1&seconds_animation=3&timezone_primary=Europe%2FLondon'
+```
+
+## GET /api/timezones and POST /api/timezones
+
+GET returns an array of supported IANA names from bundled tzdb 2026f. POST
+requires `timezone_secondary` (one of those names) and
+`timezone_secondary_enabled` (0/1). Changes are committed to NVS. The rules
+cover 1970–2100 and can require a firmware update as timezone laws change.
+
+```sh
+curl -fsS http://192.168.1.50/api/timezones
+curl -fsS -X POST http://192.168.1.50/api/timezones \
+  -d 'timezone_secondary=America%2FNew_York&timezone_secondary_enabled=1'
 ```
 
 ## POST /api/alarm

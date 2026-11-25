@@ -15,8 +15,10 @@ screen size and theme. The diagram is a **schematic**, not a screenshot.
 ├───────────────────────────────────────────────────────────────┤
 │  CLOCK OVERVIEW: time, date, Wi-Fi, alarms and hourly chime   │
 ├──────────────────────────────┬────────────────────────────────┤
-│  Display & sound             │  Alarms                        │
-│  brightness · font · effects │  five editable alarm slots     │
+│  Display & sound             │  Second timezone               │
+│  brightness · font · zone    │  optional two-line display     │
+├──────────────────────────────┼────────────────────────────────┤
+│  Alarms                      │  five editable alarm slots     │
 ├──────────────────────────────┼────────────────────────────────┤
 │  Stopwatch                   │  Reminder                      │
 ├──────────────────────────────┼────────────────────────────────┤
@@ -49,19 +51,30 @@ page; unsaved form edits can be lost.
 1. Move **Brightness** to 0–100%. Zero blanks the panel.
 2. Choose a **Font style** and **Time format**. The physical panel has no
    AM/PM indicator in 12-hour mode; the dashboard does.
-3. Choose **Blink colon** and a **Seconds animation**, if desired. Tall fonts
+3. Select the **Primary timezone**. Alarms and hourly chimes follow this zone.
+4. Choose **Blink colon** and a **Seconds animation**, if desired. Tall fonts
    do not have room for the bottom animation; timers and connection screens
    hide it too.
-4. Enable **Hourly chime** and select a pattern. Patterns differ by rhythm,
+5. Enable **Hourly chime** and select a pattern. Patterns differ by rhythm,
    not pitch, because the buzzer is active.
-5. Toggle **Button sound feedback** to enable or disable confirmation beeps.
+6. Toggle **Button sound feedback** to enable or disable confirmation beeps.
    This does not mute alarms, reminders or hourly chimes.
-6. Select **Save settings**. Changes are applied after a successful save;
+7. Select **Save settings**. Changes are applied after a successful save;
    watch for a success or error message.
 
 The first-boot default is 50% brightness, Style 1, 24-hour time, hourly
 chime off, feedback on and effects off. Saved settings override defaults.
 Fonts with legacy IDs 2–4 display as Style 1; the form maps them to Style 1.
+
+## Second timezone
+
+1. Expand **Second timezone**, choose a named region and turn **Two-line display** on.
+2. Select **Save second timezone**. The first panel row is the primary time and the second is the selected second time, without labels or AM/PM markers.
+3. Both rows use 24-hour time and the 5×7 font. Time format, font and seconds-animation controls are disabled while enabled; their saved values return when the feature is turned off. Colon blinking remains available.
+
+The dashboard footer shows the running firmware version and contact email.
+
+Timezone settings survive restart. The bundled IANA tzdb 2026f covers 1970–2100; daylight-saving rules can change and require a firmware update to refresh.
 
 ## Create or change an alarm
 

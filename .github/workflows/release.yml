@@ -26,19 +26,29 @@ jobs:
       - name: Run firmware host checks
         run: |
           cc -std=c11 -Wall -Wextra -Werror -I main \
-            main/clock_config.c main/clock_schedule.c main/clock_freshness.c \
+            main/clock_config.c main/clock_timezone.c main/clock_schedule.c main/clock_freshness.c \
             main/clock_render.c main/clock_scan.c main/clock_form.c main/clock_sound.c \
             tests/test_clock_logic.c -o /tmp/clock-logic-test
           /tmp/clock-logic-test
           cc -std=c11 -Wall -Wextra -Werror -pthread -I tests/stubs -I main \
-            main/clock_config.c main/clock_store.c tests/test_clock_store.c -o /tmp/clock-store-test
+            main/clock_config.c main/clock_timezone.c main/clock_store.c tests/test_clock_store.c -o /tmp/clock-store-test
           /tmp/clock-store-test
           cc -std=c11 -Wall -Wextra -Werror -I main \
-            main/clock_config.c main/clock_status.c tests/test_clock_status.c -o /tmp/clock-status-test
+            main/clock_config.c main/clock_timezone.c main/clock_status.c tests/test_clock_status.c -o /tmp/clock-status-test
           /tmp/clock-status-test | node tests/test_status_json.js
           cc -std=c11 -Wall -Wextra -Werror -I main \
             main/clock_timer_logic.c tests/test_clock_timers.c -o /tmp/clock-timers-test
           /tmp/clock-timers-test
+          cc -std=c11 -Wall -Wextra -Werror -I main \
+            main/clock_config.c main/clock_timezone.c main/clock_schedule.c tests/test_clock_timezone.c -o /tmp/clock-timezone-test
+          /tmp/clock-timezone-test
+          cc -std=c11 -Wall -Wextra -Werror -DCONFIG_IDF_TARGET_ESP32=1 \
+            -I tests/stubs -I main tests/test_clock_pins.c -o /tmp/clock-pins-esp32
+          /tmp/clock-pins-esp32
+          cc -std=c11 -Wall -Wextra -Werror -DCONFIG_IDF_TARGET_ESP32S3=1 \
+            -I tests/stubs -I main tests/test_clock_pins.c -o /tmp/clock-pins-s3
+          /tmp/clock-pins-s3
+          node tests/test_dashboard.mjs
           node tests/test_installer.mjs
       - name: Build and verify factory image
         run: |
@@ -53,6 +63,14 @@ jobs:
               0x8000 build/production/partition_table/partition-table.bin \
               0xf000 build/production/ota_data_initial.bin \
               0x20000 build/production/ESP_P10_Clock_BLR.bin
+            idf.py -B build/production-s3 -D SDKCONFIG=/project/build/production-s3/sdkconfig \
+              -D IDF_TARGET=esp32s3 build
+            esptool --chip esp32s3 merge-bin --flash-mode dio --flash-size 4MB --flash-freq 80m \
+              -o build/release/momentra-s3-factory.bin \
+              0x0 build/production-s3/bootloader/bootloader.bin \
+              0x8000 build/production-s3/partition_table/partition-table.bin \
+              0xf000 build/production-s3/ota_data_initial.bin \
+              0x20000 build/production-s3/ESP_P10_Clock_BLR.bin
           '
           jq -e '
             .extra_esptool_args.chip == "esp32" and
@@ -66,10 +84,22 @@ jobs:
               "0x20000": "ESP_P10_Clock_BLR.bin"
             }
           ' build/production/flasher_args.json
+          jq -e '
+            .extra_esptool_args.chip == "esp32s3" and
+            .flash_settings.flash_mode == "dio" and
+            .flash_settings.flash_size == "4MB" and
+            .flash_settings.flash_freq == "80m" and
+            .flash_files == {
+              "0x0": "bootloader/bootloader.bin",
+              "0x8000": "partition_table/partition-table.bin",
+              "0xf000": "ota_data_initial.bin",
+              "0x20000": "ESP_P10_Clock_BLR.bin"
+            }
+          ' build/production-s3/flasher_args.json
       - name: Bundle and test launcher
         run: |
           npm ci --prefix installer --no-audit --no-fund
-          sh installer/prepare-site.sh build/release/momentra-factory.bin
+          sh installer/prepare-site.sh build/release/momentra-factory.bin build/release/momentra-s3-factory.bin
           cd installer/launcher
           go test ./...
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o ../../build/release/momentra-flasher .
