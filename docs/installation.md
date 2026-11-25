@@ -97,9 +97,10 @@ merged factory image. Confirm active alarms and timers and follow
 
 The [`release.yml`](../.github/workflows/release.yml) workflow builds the
 ESP-IDF 6.1 factory image, browser bundle, and Windows and Ubuntu x86-64
-launchers. Manual workflow dispatch creates an Actions artifact without
-publishing a release. Pushing a `v*` tag triggers the build and, if it
-succeeds, creates a GitHub Release with both archives and `SHA256SUMS.txt`.
+launchers. Pushes to `main` and manual workflow dispatch create an Actions
+artifact without publishing a release. Pushing a `v*` tag triggers the build
+and, if it succeeds, creates a GitHub Release with both archives and
+`SHA256SUMS.txt`.
 Review the source and verify the actual target hardware before creating a
 release tag. A passing build is not hardware validation. No GitHub Pages
 configuration is required.
