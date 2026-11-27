@@ -25,10 +25,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-/* The build embeds the dashboard as a binary resource; the linker provides
- * these bounds, including an extra terminating byte at the end. */
-extern const char web_index_start[] asm("_binary_index_html_start");
-extern const char web_index_end[] asm("_binary_index_html_end");
+/* The build embeds the gzipped dashboard as a binary resource; the linker
+ * provides these exact bounds without a trailing NUL byte. */
+extern const uint8_t web_index_start[] asm("_binary_index_html_gz_start");
+extern const uint8_t web_index_end[] asm("_binary_index_html_gz_end");
 
 static const char *TAG = "clock_web";
 
@@ -132,11 +132,14 @@ static esp_err_t json_ok(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
-/** Serve the embedded dashboard. Returns the HTTP send result. */
+/** Serve the gzipped embedded dashboard. Returns the HTTP send result. */
 static esp_err_t index_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    return httpd_resp_send(req, web_index_start, web_index_end - web_index_start - 1);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    return httpd_resp_send(req, (const char *)web_index_start,
+                           web_index_end - web_index_start);
 }
 
 /** Gather subsystem snapshots and return the uncached status JSON response. */

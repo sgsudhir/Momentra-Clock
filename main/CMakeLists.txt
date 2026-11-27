@@ -6,4 +6,4 @@ idf_component_register(SRCS "main.c" "clock_config.c" "clock_store.c" "clock_sch
                        INCLUDE_DIRS "."
                        REQUIRES nvs_flash esp_netif lwip esp_timer esp_driver_gpio esp_wifi
                                 esp_http_server app_update esp_driver_spi esp_driver_ledc esp_driver_gptimer mdns
-                       EMBED_TXTFILES "web/index.html")
+                       EMBED_FILES "web/index.html.gz")
