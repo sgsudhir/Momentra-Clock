@@ -11,7 +11,7 @@ typedef struct {
 
 /** Parsed form; count identifies the initialized entries. */
 typedef struct {
-    clock_form_field_t fields[10];
+    clock_form_field_t fields[16];
     size_t count;
 } clock_form_t;
 

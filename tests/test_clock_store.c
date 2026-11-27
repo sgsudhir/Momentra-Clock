@@ -19,6 +19,8 @@ static struct {
     {"colon_blink", false, 0},
     {"seconds_anim", false, 0},
     {"tz2_enabled", false, 0},
+    {"magic_enabled", false, 0},
+    {"magic_pwm", false, 0},
 };
 static struct {
     const char *key;
@@ -213,9 +215,22 @@ int main(void)
     clock_store_get(&config);
     assert(config.feedback_enabled == 1 && config.colon_blink == 0 &&
            config.seconds_animation == CLOCK_SECONDS_NONE && config.brightness == 75 &&
+           config.magic_enabled == 1 && config.magic_pwm == 0 &&
            config.alarms[0].hour == 8);
     assert(strcmp(config.timezone_primary, "Asia/Kolkata") == 0 &&
            strcmp(config.timezone_secondary, "Etc/UTC") == 0 && !config.timezone_secondary_enabled);
+    config.magic_enabled = 0;
+    config.magic_pwm = 1;
+    assert(clock_store_set(&config) == ESP_OK);
+    assert(clock_store_init() == ESP_OK);
+    clock_store_get(&config);
+    assert(config.magic_enabled == 0 && config.magic_pwm == 1);
+    config.magic_enabled = 2;
+    assert(clock_store_set(&config) == ESP_ERR_INVALID_ARG);
+    config.magic_enabled = 1;
+    config.magic_pwm = 2;
+    assert(clock_store_set(&config) == ESP_ERR_INVALID_ARG);
+    config.magic_pwm = 0;
     config.feedback_enabled = 2;
     assert(clock_store_set(&config) == ESP_ERR_INVALID_ARG);
     config.feedback_enabled = 1;

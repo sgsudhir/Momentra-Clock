@@ -88,6 +88,8 @@ esp_err_t clock_store_init(void)
     if (err == ESP_OK) err = read_optional_timezone(handle, "tz_primary", current.timezone_primary);
     if (err == ESP_OK) err = read_optional_timezone(handle, "tz_secondary", current.timezone_secondary);
     if (err == ESP_OK) err = read_optional_u8(handle, "tz2_enabled", &current.timezone_secondary_enabled);
+    if (err == ESP_OK) err = read_optional_u8(handle, "magic_enabled", &current.magic_enabled);
+    if (err == ESP_OK) err = read_optional_u8(handle, "magic_pwm", &current.magic_pwm);
     nvs_close(handle);
     if (err != ESP_OK) {
         return err;
@@ -114,15 +116,33 @@ static esp_err_t commit_update(const clock_config_t *old, const clock_config_t *
     nvs_handle_t handle;
     esp_err_t err = nvs_open("clock", NVS_READWRITE, &handle);
     if (err == ESP_OK) {
-        err = nvs_set_blob(handle, "config_v1", config, sizeof(clock_config_v1_t));
-        if (err == ESP_OK) {
+        if (memcmp(old, config, sizeof(clock_config_v1_t)) != 0) {
+            err = nvs_set_blob(handle, "config_v1", config, sizeof(clock_config_v1_t));
+        }
+        if (err == ESP_OK && old->feedback_enabled != config->feedback_enabled) {
             err = nvs_set_u8(handle, "feedback", config->feedback_enabled);
         }
-        if (err == ESP_OK) err = nvs_set_u8(handle, "colon_blink", config->colon_blink);
-        if (err == ESP_OK) err = nvs_set_u8(handle, "seconds_anim", config->seconds_animation);
-        if (err == ESP_OK) err = nvs_set_str(handle, "tz_primary", config->timezone_primary);
-        if (err == ESP_OK) err = nvs_set_str(handle, "tz_secondary", config->timezone_secondary);
-        if (err == ESP_OK) err = nvs_set_u8(handle, "tz2_enabled", config->timezone_secondary_enabled);
+        if (err == ESP_OK && old->colon_blink != config->colon_blink) {
+            err = nvs_set_u8(handle, "colon_blink", config->colon_blink);
+        }
+        if (err == ESP_OK && old->seconds_animation != config->seconds_animation) {
+            err = nvs_set_u8(handle, "seconds_anim", config->seconds_animation);
+        }
+        if (err == ESP_OK && strcmp(old->timezone_primary, config->timezone_primary) != 0) {
+            err = nvs_set_str(handle, "tz_primary", config->timezone_primary);
+        }
+        if (err == ESP_OK && strcmp(old->timezone_secondary, config->timezone_secondary) != 0) {
+            err = nvs_set_str(handle, "tz_secondary", config->timezone_secondary);
+        }
+        if (err == ESP_OK && old->timezone_secondary_enabled != config->timezone_secondary_enabled) {
+            err = nvs_set_u8(handle, "tz2_enabled", config->timezone_secondary_enabled);
+        }
+        if (err == ESP_OK && old->magic_enabled != config->magic_enabled) {
+            err = nvs_set_u8(handle, "magic_enabled", config->magic_enabled);
+        }
+        if (err == ESP_OK && old->magic_pwm != config->magic_pwm) {
+            err = nvs_set_u8(handle, "magic_pwm", config->magic_pwm);
+        }
         if (err == ESP_OK) {
             err = nvs_commit(handle);
         }

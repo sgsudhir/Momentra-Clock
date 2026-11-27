@@ -27,7 +27,7 @@ jobs:
         run: |
           cc -std=c11 -Wall -Wextra -Werror -I main \
             main/clock_config.c main/clock_timezone.c main/clock_schedule.c main/clock_freshness.c \
-            main/clock_render.c main/clock_scan.c main/clock_form.c main/clock_sound.c \
+            main/clock_magic_time.c main/clock_render.c main/clock_scan.c main/clock_form.c main/clock_sound.c \
             tests/test_clock_logic.c -o /tmp/clock-logic-test
           /tmp/clock-logic-test
           cc -std=c11 -Wall -Wextra -Werror -pthread -I tests/stubs -I main \
@@ -40,7 +40,7 @@ jobs:
             main/clock_timer_logic.c tests/test_clock_timers.c -o /tmp/clock-timers-test
           /tmp/clock-timers-test
           cc -std=c11 -Wall -Wextra -Werror -I main \
-            main/clock_config.c main/clock_timezone.c main/clock_schedule.c tests/test_clock_timezone.c -o /tmp/clock-timezone-test
+            main/clock_config.c main/clock_timezone.c main/clock_schedule.c main/clock_magic_time.c tests/test_clock_timezone.c -o /tmp/clock-timezone-test
           /tmp/clock-timezone-test
           cc -std=c11 -Wall -Wextra -Werror -DCONFIG_IDF_TARGET_ESP32=1 \
             -I tests/stubs -I main tests/test_clock_pins.c -o /tmp/clock-pins-esp32
@@ -121,6 +121,18 @@ jobs:
           name: portable-flasher
           path: build/packages/assets/*
           if-no-files-found: error
+
+  companion:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: companion/package-lock.json
+      - run: npm ci --prefix companion --no-audit --no-fund
+      - run: npm run build --prefix companion
 
   release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')

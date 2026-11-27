@@ -23,7 +23,7 @@ assert.throws(() => validatePreset("ESP32", 2 * 1024 * 1024));
 assert.throws(() => validatePreset("ESP32-S3", 2 * 1024 * 1024));
 
 const source = (await readFile(new URL("../installer/app.js", import.meta.url), "utf8"))
-  .replace(/^import .*;\n/gm, "");
+  .replace(/^import .*;\r?\n/gm, "");
 
 async function setup(chipName = "ESP32", stub = true, clipboard = {writeText: async () => {}}) {
   const calls = [];

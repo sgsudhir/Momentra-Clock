@@ -7,7 +7,7 @@ int main(void)
 {
     clock_status_t status = {.uptime_seconds = 42, .sync_age_seconds = -1};
     clock_config_defaults(&status.config);
-    char output[1400];
+    char output[1800];
     char tiny[10];
     assert(!clock_status_json(&status, tiny, sizeof(tiny)));
     assert(clock_status_json(&status, output, sizeof(output)));
@@ -30,6 +30,8 @@ int main(void)
     status.sync_age_seconds = 15;
     status.ringing = true;
     status.ringing_mask = 4;
+    status.magic_playing = true;
+    status.magic_track = 3;
     status.stopwatch_state = TIMER_RUNNING;
     status.stopwatch_ms = 1234;
     status.reminder_state = TIMER_PAUSED;

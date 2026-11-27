@@ -1,16 +1,19 @@
 #include "clock_web.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "clock_alarm.h"
 #include "clock_display.h"
 #include "clock_form.h"
 #include "clock_network.h"
+#include "clock_sound.h"
 #include "clock_status.h"
 #include "clock_store.h"
 #include "clock_time.h"
 #include "clock_timers.h"
+#include "esp_app_desc.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -46,19 +49,85 @@ static bool read_form(httpd_req_t *req, clock_form_t *form)
     return clock_form_parse(form, body, used);
 }
 
-/** Send a JSON error using the supplied HTTP status and fixed message. */
+/** Attach permissive LAN CORS headers to API responses. */
+static void set_cors_headers(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+}
+
+/** Handle CORS preflight requests for API wildcard endpoints. */
+static esp_err_t options_handler(httpd_req_t *req)
+{
+    set_cors_headers(req);
+    httpd_resp_set_status(req, "204 No Content");
+    return httpd_resp_send(req, NULL, 0);
+}
+
+/** Append JSON-escaped text into dst[used..capacity-1], reserving room for suffix. */
+static void append_json_escaped(char *dst, size_t capacity, size_t *used, const char *src)
+{
+    static const char hex[] = "0123456789abcdef";
+    for (size_t i = 0; src && src[i] != '\0'; ++i) {
+        unsigned char c = (unsigned char)src[i];
+        char esc[7];
+        size_t len = 1;
+        if (c == '"' || c == '\\') {
+            esc[0] = '\\';
+            esc[1] = (char)c;
+            len = 2;
+        } else if (c == '\b') {
+            memcpy(esc, "\\b", 2);
+            len = 2;
+        } else if (c == '\f') {
+            memcpy(esc, "\\f", 2);
+            len = 2;
+        } else if (c == '\n') {
+            memcpy(esc, "\\n", 2);
+            len = 2;
+        } else if (c == '\r') {
+            memcpy(esc, "\\r", 2);
+            len = 2;
+        } else if (c == '\t') {
+            memcpy(esc, "\\t", 2);
+            len = 2;
+        } else if (c < 0x20) {
+            esc[0] = '\\';
+            esc[1] = 'u';
+            esc[2] = '0';
+            esc[3] = '0';
+            esc[4] = hex[c >> 4];
+            esc[5] = hex[c & 0x0f];
+            len = 6;
+        } else {
+            esc[0] = (char)c;
+        }
+        if (*used + len >= capacity) break;
+        memcpy(dst + *used, esc, len);
+        *used += len;
+    }
+}
+
+/** Send a JSON error using the supplied HTTP status and escaped message. */
 static esp_err_t json_error(httpd_req_t *req, const char *status, const char *message)
 {
+    set_cors_headers(req);
     httpd_resp_set_status(req, status);
     httpd_resp_set_type(req, "application/json");
-    char body[160];
-    snprintf(body, sizeof(body), "{\"error\":\"%s\"}", message);
+    char body[256];
+    const char prefix[] = "{\"error\":\"";
+    size_t used = sizeof(prefix) - 1;
+    memcpy(body, prefix, used);
+    append_json_escaped(body, sizeof(body) - 3, &used, message);
+    memcpy(body + used, "\"}", 3);
     return httpd_resp_sendstr(req, body);
 }
 
 /** Send the standard JSON success response. */
 static esp_err_t json_ok(httpd_req_t *req)
 {
+    set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
@@ -118,17 +187,26 @@ static esp_err_t status_handler(httpd_req_t *req)
     status.buzzer_configured = clock_alarm_is_configured();
     status.ringing = alarm.ringing;
     status.ringing_mask = alarm.alarm_mask;
+    status.magic_playing = alarm.magic_playing;
+    status.magic_track = alarm.magic_playing ? alarm.magic_track : -1;
     status.stopwatch_state = timers.stopwatch_state;
     status.stopwatch_ms = timers.stopwatch_us / 1000;
     status.reminder_state = timers.reminder_state;
     status.reminder_ms = (timers.reminder_us + 999) / 1000;
-    char body[1400];
-    if (!clock_status_json(&status, body, sizeof(body))) {
+    char *body = malloc(1800);
+    if (!body) {
+        return json_error(req, "500 Internal Server Error", "out of memory");
+    }
+    if (!clock_status_json(&status, body, 1800)) {
+        free(body);
         return json_error(req, "500 Internal Server Error", "status too large");
     }
+    set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    return httpd_resp_sendstr(req, body);
+    esp_err_t send_err = httpd_resp_sendstr(req, body);
+    free(body);
+    return send_err;
 }
 
 /** Validate display/sound settings and save with optimistic conflict detection.
@@ -138,12 +216,16 @@ static esp_err_t settings_handler(httpd_req_t *req)
 {
     clock_form_t form;
     int brightness, font, format, hourly, pattern, feedback = 0, blink = 0, animation = 0;
+    int magic_enabled = 0, magic_pwm = 0;
     if (!read_form(req, &form)) return json_error(req, "400 Bad Request", "invalid settings");
     bool has_feedback = clock_form_value(&form, "feedback_enabled") != NULL;
     bool has_blink = clock_form_value(&form, "colon_blink") != NULL;
     bool has_animation = clock_form_value(&form, "seconds_animation") != NULL;
+    bool has_magic_enabled = clock_form_value(&form, "magic_enabled") != NULL;
+    bool has_magic_pwm = clock_form_value(&form, "magic_pwm") != NULL;
     const char *timezone = clock_form_value(&form, "timezone_primary");
-    if (form.count != 5U + has_feedback + has_blink + has_animation + (timezone != NULL) ||
+    if (form.count != 5U + has_feedback + has_blink + has_animation + (timezone != NULL) +
+                      has_magic_enabled + has_magic_pwm ||
         !clock_form_int(&form, "brightness", 0, 100, &brightness) ||
         !clock_form_int(&form, "font", 0, CLOCK_FONT_COUNT - 1, &font) ||
         !clock_form_int(&form, "format_12h", 0, 1, &format) ||
@@ -153,7 +235,9 @@ static esp_err_t settings_handler(httpd_req_t *req)
         (has_blink && !clock_form_int(&form, "colon_blink", 0, 1, &blink)) ||
         (timezone && !clock_timezone_valid(timezone)) ||
         (has_animation && !clock_form_int(&form, "seconds_animation", 0,
-                                          CLOCK_SECONDS_ANIMATION_COUNT - 1, &animation))) {
+                                          CLOCK_SECONDS_ANIMATION_COUNT - 1, &animation)) ||
+        (has_magic_enabled && !clock_form_int(&form, "magic_enabled", 0, 1, &magic_enabled)) ||
+        (has_magic_pwm && !clock_form_int(&form, "magic_pwm", 0, 1, &magic_pwm))) {
         return json_error(req, "400 Bad Request", "invalid settings");
     }
     clock_config_t old;
@@ -167,6 +251,8 @@ static esp_err_t settings_handler(httpd_req_t *req)
     if (has_feedback) updated.feedback_enabled = feedback;
     if (has_blink) updated.colon_blink = blink;
     if (has_animation) updated.seconds_animation = animation;
+    if (has_magic_enabled) updated.magic_enabled = magic_enabled;
+    if (has_magic_pwm) updated.magic_pwm = magic_pwm;
     if (timezone) {
         memset(updated.timezone_primary, 0, sizeof(updated.timezone_primary));
         strcpy(updated.timezone_primary, timezone);
@@ -183,6 +269,7 @@ static esp_err_t settings_handler(httpd_req_t *req)
 
 static esp_err_t timezones_handler(httpd_req_t *req)
 {
+    set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     char chunk[512] = "[";
@@ -266,6 +353,43 @@ static esp_err_t stop_handler(httpd_req_t *req)
     return json_ok(req);
 }
 
+/** Play or stop an interesting-time music track for testing. */
+static esp_err_t sound_test_handler(httpd_req_t *req)
+{
+    clock_form_t form;
+    if (!read_form(req, &form)) return json_error(req, "400 Bad Request", "invalid sound test request");
+    bool has_track = clock_form_value(&form, "track") != NULL;
+    bool has_pwm = clock_form_value(&form, "pwm") != NULL;
+    bool has_stop = clock_form_value(&form, "stop") != NULL;
+    if (form.count != (size_t)has_track + (size_t)has_pwm + (size_t)has_stop) {
+        return json_error(req, "400 Bad Request", "invalid sound test request");
+    }
+    int stop_val = 0;
+    if (has_stop) {
+        if (!clock_form_int(&form, "stop", 0, 1, &stop_val)) {
+            return json_error(req, "400 Bad Request", "invalid stop flag");
+        }
+        if (stop_val == 1) {
+            clock_alarm_stop();
+            return json_ok(req);
+        }
+    }
+    int track = -1;
+    int pwm = -1;
+    if (!has_track || !clock_form_int(&form, "track", -1, CLOCK_MAGIC_TRACK_COUNT - 1, &track) ||
+        (has_pwm && !clock_form_int(&form, "pwm", 0, 1, &pwm))) {
+        return json_error(req, "400 Bad Request", "invalid track");
+    }
+    if (!clock_alarm_is_configured()) {
+        return json_error(req, "409 Conflict", "buzzer not configured");
+    }
+    esp_err_t err = clock_alarm_play_magic(track, has_pwm ? pwm : -1);
+    if (err != ESP_OK) {
+        return json_error(req, "500 Internal Server Error", "could not start sound");
+    }
+    return json_ok(req);
+}
+
 /** Validate a stopwatch/reminder command and apply its state transition. */
 static esp_err_t timer_handler(httpd_req_t *req)
 {
@@ -321,6 +445,7 @@ static esp_err_t scan_status_handler(httpd_req_t *req)
     if (result.state == SCAN_FAILED) {
         return json_error(req, "500 Internal Server Error", "Wi-Fi scan failed; retry");
     }
+    set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     if (result.state != SCAN_DONE) {
@@ -405,8 +530,9 @@ static esp_err_t ota_handler(httpd_req_t *req)
     if (!network.connected || network.ap_active) {
         return json_error(req, "403 Forbidden", "OTA requires station-only mode");
     }
+    const esp_partition_t *running = esp_ota_get_running_partition();
     const esp_partition_t *partition = esp_ota_get_next_update_partition(NULL);
-    if (!partition || req->content_len <= 0 || req->content_len > partition->size) {
+    if (!partition || req->content_len <= 0 || (size_t)req->content_len > partition->size) {
         return json_error(req, "400 Bad Request", "invalid firmware size");
     }
     /* Flash writes interfere with scan timing; blank and pause the panel until
@@ -426,12 +552,21 @@ static esp_err_t ota_handler(httpd_req_t *req)
     }
     char buffer[1024];
     size_t remaining = req->content_len;
+    bool first_chunk = true;
     while (remaining > 0) {
         int count = httpd_req_recv(req, buffer, remaining < sizeof(buffer) ? remaining : sizeof(buffer));
         if (count <= 0) {
             esp_ota_abort(handle);
             resume_display();
             return json_error(req, "400 Bad Request", "firmware upload interrupted");
+        }
+        if (first_chunk) {
+            first_chunk = false;
+            if ((uint8_t)buffer[0] != 0xE9) {
+                esp_ota_abort(handle);
+                resume_display();
+                return json_error(req, "400 Bad Request", "invalid firmware image header");
+            }
         }
         err = esp_ota_write(handle, buffer, count);
         if (err != ESP_OK) {
@@ -448,6 +583,14 @@ static esp_err_t ota_handler(httpd_req_t *req)
         resume_display();
         return json_error(req, "400 Bad Request", "invalid firmware");
     }
+    esp_app_desc_t incoming_desc;
+    const esp_app_desc_t *running_desc = esp_app_get_description();
+    if (esp_ota_get_partition_description(partition, &incoming_desc) != ESP_OK ||
+        strcmp(incoming_desc.project_name, running_desc->project_name) != 0) {
+        ESP_LOGW(TAG, "OTA rejected incompatible firmware project");
+        resume_display();
+        return json_error(req, "400 Bad Request", "incompatible firmware project");
+    }
     err = esp_ota_set_boot_partition(partition);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "OTA boot selection failed: %s", esp_err_to_name(err));
@@ -455,6 +598,9 @@ static esp_err_t ota_handler(httpd_req_t *req)
         return json_error(req, "500 Internal Server Error", "OTA boot selection failed");
     }
     if (!schedule_restart()) {
+        if (running) {
+            esp_ota_set_boot_partition(running);
+        }
         resume_display();
         return json_error(req, "500 Internal Server Error", "uploaded; restart failed");
     }
@@ -466,7 +612,8 @@ esp_err_t clock_web_start(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.core_id = 0;
     config.stack_size = 8192;
-    config.max_uri_handlers = 13;
+    config.max_uri_handlers = 18;
+    config.uri_match_fn = httpd_uri_match_wildcard;
     httpd_handle_t server;
     esp_err_t err = httpd_start(&server, &config);
     if (err != ESP_OK) return err;
@@ -478,12 +625,14 @@ esp_err_t clock_web_start(void)
         {.uri = "/api/timezones", .method = HTTP_POST, .handler = secondary_timezone_handler},
         {.uri = "/api/alarm", .method = HTTP_POST, .handler = alarm_handler},
         {.uri = "/api/alarm/stop", .method = HTTP_POST, .handler = stop_handler},
+        {.uri = "/api/sound/test", .method = HTTP_POST, .handler = sound_test_handler},
         {.uri = "/api/timer", .method = HTTP_POST, .handler = timer_handler},
         {.uri = "/api/wifi/scan", .method = HTTP_POST, .handler = scan_start_handler},
         {.uri = "/api/wifi/scan", .method = HTTP_GET, .handler = scan_status_handler},
         {.uri = "/api/wifi", .method = HTTP_POST, .handler = wifi_handler},
         {.uri = "/api/reboot", .method = HTTP_POST, .handler = reboot_handler},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = ota_handler},
+        {.uri = "/api/*", .method = HTTP_OPTIONS, .handler = options_handler},
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i) {
         err = httpd_register_uri_handler(server, &routes[i]);
