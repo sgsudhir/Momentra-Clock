@@ -30,6 +30,8 @@ typedef struct {
     bool buzzer_configured;   /**< Buzzer GPIO is configured. */
     bool ringing;             /**< A scheduled alarm is ringing. */
     uint8_t ringing_mask;     /**< Bit i identifies ringing alarm slot i. */
+    bool magic_playing;       /**< Interesting-time music track is currently playing. */
+    int magic_track;          /**< Active track ID 0..7, or -1 when idle. */
     clock_timer_state_t stopwatch_state; /**< Stopwatch lifecycle state. */
     int64_t stopwatch_ms;      /**< Elapsed stopwatch milliseconds. */
     clock_timer_state_t reminder_state;  /**< Reminder lifecycle state. */

@@ -1,4 +1,5 @@
 #include "clock_schedule.h"
+#include "clock_magic_time.h"
 #include <string.h>
 
 void clock_schedule_init(clock_schedule_t *schedule)
@@ -32,6 +33,9 @@ clock_events_t clock_schedule_check(clock_schedule_t *schedule, const clock_conf
     unsigned hour = minute_of_day / 60;
     unsigned minute_of_hour = minute_of_day % 60;
     events.hourly = config->hourly_enabled && minute_of_hour == 0;
+    bool use_12h = config->format_12h && !config->timezone_secondary_enabled;
+    events.magic = config->magic_enabled &&
+        clock_magic_classify((int)hour, (int)minute_of_hour, use_12h) != CLOCK_MAGIC_NONE;
     for (unsigned i = 0; i < CLOCK_ALARM_COUNT; ++i) {
         const clock_alarm_t *alarm = &config->alarms[i];
         if (alarm->enabled && alarm->hour == hour && alarm->minute == minute_of_hour) {

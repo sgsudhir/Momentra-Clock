@@ -40,7 +40,9 @@ func resolveClock(ctx context.Context, host string) ([]netip.Addr, error) {
 func clockClient() *http.Client {
 	dialer := &net.Dialer{Timeout: 4 * time.Second}
 	transport := &http.Transport{
-		Proxy: nil,
+		Proxy:           nil,
+		MaxIdleConns:    4,
+		IdleConnTimeout: 30 * time.Second,
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(address)
 			if err != nil {
@@ -88,10 +90,10 @@ func clockTarget(target string) (string, error) {
 	return ip.String(), nil
 }
 
+var sharedClockClient = clockClient()
+
 func proxyClock(w http.ResponseWriter, r *http.Request, path string) {
-	client := clockClient()
-	defer client.CloseIdleConnections()
-	proxyClockWithClient(w, r, path, client)
+	proxyClockWithClient(w, r, path, sharedClockClient)
 }
 
 func proxyClockWithClient(w http.ResponseWriter, r *http.Request, path string, client *http.Client) {

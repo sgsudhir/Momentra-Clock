@@ -6,6 +6,7 @@
 #include "clock_config.h"
 #include "clock_freshness.h"
 #include "clock_form.h"
+#include "clock_magic_time.h"
 #include "clock_render.h"
 #include "clock_scan.h"
 #include "clock_schedule.h"
@@ -299,6 +300,46 @@ int main(void)
     config.alarms[0].duration_seconds = 10;
     config.brightness = 101;
     assert(!clock_config_valid(&config));
+
+    /* Interesting-time classifier tests */
+    assert(clock_magic_classify(1, 23, false) == CLOCK_MAGIC_SEQUENCE);
+    assert(clock_magic_classify(1, 23, true) == CLOCK_MAGIC_SEQUENCE);
+    assert(clock_magic_classify(13, 23, true) == CLOCK_MAGIC_SEQUENCE);
+    assert(clock_magic_classify(23, 45, false) == CLOCK_MAGIC_SEQUENCE);
+    assert(clock_magic_classify(23, 45, true) == CLOCK_MAGIC_NONE);
+    assert(clock_magic_classify(1, 11, false) == CLOCK_MAGIC_REPDIGIT);
+    assert(clock_magic_classify(1, 11, true) == CLOCK_MAGIC_REPDIGIT);
+    assert(clock_magic_classify(0, 0, false) == CLOCK_MAGIC_REPDIGIT);
+    assert(clock_magic_classify(0, 0, true) == CLOCK_MAGIC_NONE);
+    assert(clock_magic_classify(11, 11, false) == CLOCK_MAGIC_REPDIGIT);
+    assert(clock_magic_classify(11, 11, true) == CLOCK_MAGIC_REPDIGIT);
+    assert(clock_magic_classify(22, 22, false) == CLOCK_MAGIC_REPDIGIT);
+    assert(clock_magic_classify(22, 22, true) == CLOCK_MAGIC_NONE);
+    assert(clock_magic_classify(12, 21, false) == CLOCK_MAGIC_PALINDROME);
+    assert(clock_magic_classify(12, 21, true) == CLOCK_MAGIC_PALINDROME);
+    assert(clock_magic_classify(3, 21, false) == CLOCK_MAGIC_SEQUENCE);
+    assert(clock_magic_classify(3, 21, true) == CLOCK_MAGIC_SEQUENCE);
+    assert(clock_magic_classify(14, 27, false) == CLOCK_MAGIC_NONE);
+    assert(clock_magic_classify(14, 27, true) == CLOCK_MAGIC_NONE);
+    assert(clock_magic_classify(-1, 0, false) == CLOCK_MAGIC_NONE);
+    assert(clock_magic_classify(24, 0, false) == CLOCK_MAGIC_NONE);
+
+    /* Magic-time musical track active & PWM note tests */
+    for (unsigned track = 0; track < CLOCK_MAGIC_TRACK_COUNT; ++track) {
+        bool finished = true;
+        uint32_t start_freq = clock_sound_magic_note(track, 0, &finished);
+        assert(!finished && start_freq > 0);
+        assert(clock_sound_magic_active(track, 0));
+        bool end_finished = false;
+        assert(clock_sound_magic_note(track, 10000, &end_finished) == 0);
+        assert(end_finished);
+        assert(!clock_sound_magic_active(track, 10000));
+    }
+    bool bad_finished = false;
+    assert(clock_sound_magic_note(CLOCK_MAGIC_TRACK_COUNT, 0, &bad_finished) == 0);
+    assert(bad_finished);
+    assert(!clock_sound_magic_active(CLOCK_MAGIC_TRACK_COUNT, 0));
+
     puts("clock logic tests passed");
     return 0;
 }

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+firmware/build/
+firmware/managed_components/
+firmware/dependencies.lock.bak
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/installer/node_modules/
+firmware/installer/dist/
+firmware/installer/launcher/site/

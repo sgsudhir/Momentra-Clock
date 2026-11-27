@@ -49,6 +49,8 @@ typedef struct {
     char timezone_primary[CLOCK_TIMEZONE_NAME_SIZE];
     char timezone_secondary[CLOCK_TIMEZONE_NAME_SIZE];
     uint8_t timezone_secondary_enabled;
+    uint8_t magic_enabled;     /**< Enable interesting-time random music. */
+    uint8_t magic_pwm;         /**< 0 for active ON/OFF buzzer, 1 for passive PWM notes. */
 } clock_config_t;
 
 /** Initialize *config with safe defaults, including disabled alarms.

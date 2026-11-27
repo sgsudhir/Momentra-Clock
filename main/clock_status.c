@@ -4,11 +4,59 @@
 #include <stdio.h>
 #include <string.h>
 
+static bool append_json_str(char *buffer, size_t capacity, size_t *used, const char *src)
+{
+    static const char hex[] = "0123456789abcdef";
+    if (*used >= capacity) return false;
+    buffer[(*used)++] = '"';
+    for (size_t i = 0; src && src[i] != '\0'; ++i) {
+        unsigned char c = (unsigned char)src[i];
+        char esc[7];
+        size_t len = 1;
+        if (c == '"' || c == '\\') {
+            esc[0] = '\\';
+            esc[1] = (char)c;
+            len = 2;
+        } else if (c == '\b') {
+            memcpy(esc, "\\b", 2);
+            len = 2;
+        } else if (c == '\f') {
+            memcpy(esc, "\\f", 2);
+            len = 2;
+        } else if (c == '\n') {
+            memcpy(esc, "\\n", 2);
+            len = 2;
+        } else if (c == '\r') {
+            memcpy(esc, "\\r", 2);
+            len = 2;
+        } else if (c == '\t') {
+            memcpy(esc, "\\t", 2);
+            len = 2;
+        } else if (c < 0x20) {
+            esc[0] = '\\';
+            esc[1] = 'u';
+            esc[2] = '0';
+            esc[3] = '0';
+            esc[4] = hex[c >> 4];
+            esc[5] = hex[c & 0x0f];
+            len = 6;
+        } else {
+            esc[0] = (char)c;
+        }
+        if (*used + len >= capacity) return false;
+        memcpy(buffer + *used, esc, len);
+        *used += len;
+    }
+    if (*used + 1 >= capacity) return false;
+    buffer[(*used)++] = '"';
+    return true;
+}
+
 bool clock_status_json(const clock_status_t *status, char *buffer, size_t capacity)
 {
     if (!status || !buffer || !capacity) return false;
     /* Prepare JSON tokens for optional fields: unavailable values are null,
-     * rather than misleading zeroes. The fixed fields need no string escaping. */
+     * rather than misleading zeroes. String fields are escaped defensively. */
     char rssi[16], age[24], timestamp[24], timestamp_ms[24], offset1[16], offset2[16];
     char ip[20];
     if (status->ip_valid) {
@@ -46,9 +94,13 @@ bool clock_status_json(const clock_status_t *status, char *buffer, size_t capaci
         strcpy(offset1, "null");
         strcpy(offset2, "null");
     }
-    int length = snprintf(buffer, capacity,
-        "{\"firmware_version\":\"" CLOCK_FIRMWARE_VERSION "\","
-        "\"uptime_seconds\":%lld,\"free_heap_bytes\":%u,\"min_free_heap_bytes\":%u,"
+    size_t used = 0;
+    int length = snprintf(buffer, capacity, "{\"firmware_version\":");
+    if (length < 0 || (size_t)length >= capacity) return false;
+    used = (size_t)length;
+    if (!append_json_str(buffer, capacity, &used, CLOCK_FIRMWARE_VERSION)) return false;
+    length = snprintf(buffer + used, capacity - used,
+        ",\"uptime_seconds\":%lld,\"free_heap_bytes\":%u,\"min_free_heap_bytes\":%u,"
         "\"wifi_connected\":%s,\"setup_ap\":%s,\"wifi_rssi\":%s,\"local_ip\":%s,"
         "\"chip_id\":\"%02X%02X%02X%02X%02X%02X\","
         "\"wifi_mac\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
@@ -59,9 +111,7 @@ bool clock_status_json(const clock_status_t *status, char *buffer, size_t capaci
         "\"reminder_state\":%u,\"reminder_ms\":%lld,\"brightness\":%u,\"font\":%u,"
         "\"format_12h\":%u,\"hourly_enabled\":%u,\"hourly_pattern\":%u,"
         "\"feedback_enabled\":%u,\"colon_blink\":%u,\"seconds_animation\":%u,"
-        "\"timezone_primary\":\"%s\",\"timezone_secondary\":\"%s\","
-        "\"timezone_secondary_enabled\":%u,\"timezone_primary_offset\":%s,"
-        "\"timezone_secondary_offset\":%s,\"alarms\":[",
+        "\"timezone_primary\":",
         (long long)status->uptime_seconds, (unsigned)status->free_heap_bytes,
         (unsigned)status->min_free_heap_bytes, status->wifi_connected ? "true" : "false",
         status->setup_ap ? "true" : "false", rssi, ip,
@@ -76,12 +126,27 @@ bool clock_status_json(const clock_status_t *status, char *buffer, size_t capaci
         (unsigned)status->reminder_state, (long long)status->reminder_ms,
         config->brightness, config->font, config->format_12h,
         config->hourly_enabled, config->hourly_pattern, config->feedback_enabled,
-        config->colon_blink, config->seconds_animation, config->timezone_primary,
-        config->timezone_secondary, config->timezone_secondary_enabled, offset1, offset2);
-    if (length < 0 || (size_t)length >= capacity) return false;
+        config->colon_blink, config->seconds_animation);
+    if (length < 0 || (size_t)length >= capacity - used) return false;
+    used += (size_t)length;
+    if (!append_json_str(buffer, capacity, &used, config->timezone_primary)) return false;
+    length = snprintf(buffer + used, capacity - used, ",\"timezone_secondary\":");
+    if (length < 0 || (size_t)length >= capacity - used) return false;
+    used += (size_t)length;
+    if (!append_json_str(buffer, capacity, &used, config->timezone_secondary)) return false;
+    int magic_track = status->magic_playing ? status->magic_track : -1;
+    length = snprintf(buffer + used, capacity - used,
+        ",\"timezone_secondary_enabled\":%u,\"timezone_primary_offset\":%s,"
+        "\"timezone_secondary_offset\":%s,"
+        "\"magic_enabled\":%u,\"magic_pwm\":%u,"
+        "\"magic_playing\":%s,\"magic_track\":%d,\"alarms\":[",
+        config->timezone_secondary_enabled, offset1, offset2,
+        config->magic_enabled, config->magic_pwm,
+        status->magic_playing ? "true" : "false", magic_track);
+    if (length < 0 || (size_t)length >= capacity - used) return false;
     /* snprintf reports the required size even on truncation. Check every
      * append before advancing the cursor, including space for the final NUL. */
-    size_t used = length;
+    used += (size_t)length;
     for (unsigned i = 0; i < CLOCK_ALARM_COUNT; ++i) {
         const clock_alarm_t *item = &config->alarms[i];
         length = snprintf(buffer + used, capacity - used,

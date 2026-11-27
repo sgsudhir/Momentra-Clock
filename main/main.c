@@ -23,6 +23,12 @@ void app_main(void)
     esp_ota_img_states_t state;
     esp_err_t err = esp_ota_get_state_partition(running, &state);
     if (err == ESP_OK && state == ESP_OTA_IMG_PENDING_VERIFY) {
+#ifdef CONFIG_CLOCK_PANEL_ENABLED
+        if (!clock_display_is_ready()) {
+            ESP_LOGE("app", "Panel driver not ready during OTA verification; rolling back");
+            esp_ota_mark_app_invalid_rollback_and_reboot();
+        }
+#endif
         ESP_ERROR_CHECK(esp_ota_mark_app_valid_cancel_rollback());
     } else if (err != ESP_OK && err != ESP_ERR_NOT_FOUND) {
         ESP_ERROR_CHECK(err);

@@ -15,6 +15,7 @@ process.stdin.on('end', () => {
     'colon_blink', 'seconds_animation',
     'timezone_primary', 'timezone_secondary', 'timezone_secondary_enabled',
     'timezone_primary_offset', 'timezone_secondary_offset',
+    'magic_enabled', 'magic_pwm', 'magic_playing', 'magic_track',
     'min_free_heap_bytes', 'ringing', 'ringing_mask', 'setup_ap',
     'stopwatch_state', 'stopwatch_ms', 'reminder_state', 'reminder_ms',
     'sync_age_seconds', 'time_valid', 'unix_time', 'unix_time_ms', 'uptime_seconds',
@@ -32,6 +33,10 @@ process.stdin.on('end', () => {
   assert.equal(disconnected.seconds_animation, 0);
   assert.equal(disconnected.timezone_primary, 'Asia/Kolkata');
   assert.equal(disconnected.timezone_primary_offset, null);
+  assert.equal(disconnected.magic_enabled, 1);
+  assert.equal(disconnected.magic_pwm, 0);
+  assert.equal(disconnected.magic_playing, false);
+  assert.equal(disconnected.magic_track, -1);
   assert.equal(connected.wifi_rssi, -67);
   assert.equal(connected.local_ip, '192.168.1.23');
   assert.equal(connected.chip_id, '1200000000AB');
@@ -46,6 +51,8 @@ process.stdin.on('end', () => {
   assert.equal(connected.timezone_primary_offset, 19800);
   assert.equal(connected.timezone_secondary_offset, 0);
   assert.equal(connected.ringing_mask, 4);
+  assert.equal(connected.magic_playing, true);
+  assert.equal(connected.magic_track, 3);
   assert.equal(connected.stopwatch_state, 1);
   assert.equal(connected.stopwatch_ms, 1234);
   assert.equal(connected.reminder_state, 2);

@@ -15,6 +15,7 @@ typedef struct {
 typedef struct {
     uint8_t alarms; /**< Mask of enabled alarm slots matching this minute. */
     bool hourly;    /**< Hourly chime is enabled and this is minute zero. */
+    bool magic;     /**< Interesting-time music is enabled and this minute matches. */
 } clock_events_t;
 
 /** Initialize a non-NULL schedule before its first check. */

@@ -125,6 +125,7 @@ tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
 .ota-stats span { color: #a9bdcc; font-size: .75rem; }
 .ota-stats strong { color: #ddfff2; font-size: .95rem; }
 .ota-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .8rem; }
+.ota-progress { width: 100%; height: 10px; margin-top: .75rem; accent-color: #8be8cb; }
 .ota-result { margin: .75rem 0 0; color: #d7f4e8; overflow-wrap: anywhere; }
 .ota-result:empty { display: none; }
 .ota-summary:focus-visible { outline: 3px solid #d5fff3; outline-offset: 5px; }

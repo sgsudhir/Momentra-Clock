@@ -12,8 +12,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -85,6 +87,8 @@ func openBrowser(url string) error {
 	switch runtime.GOOS {
 	case "windows":
 		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		return exec.Command("open", url).Start()
 	case "linux":
 		return exec.Command("xdg-open", url).Start()
 	default:
@@ -108,7 +112,7 @@ func main() {
 	server := &http.Server{ReadHeaderTimeout: 5 * time.Second}
 	shutdownDone := make(chan struct{})
 	var shutdownOnce sync.Once
-	server.Handler = handler(site, address, func() {
+	triggerShutdown := func() {
 		shutdownOnce.Do(func() {
 			go func() {
 				defer close(shutdownDone)
@@ -119,7 +123,20 @@ func main() {
 				}
 			}()
 		})
-	})
+	}
+	server.Handler = handler(site, address, triggerShutdown)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	go func() {
+		select {
+		case <-sigCh:
+			triggerShutdown()
+		case <-shutdownDone:
+		}
+	}()
+
 	fmt.Printf("Momentra ESP Flasher: %s\nKeep this window open. Press Ctrl+C to exit.\n", url)
 	if !*noBrowser {
 		if err := openBrowser(url); err != nil {
